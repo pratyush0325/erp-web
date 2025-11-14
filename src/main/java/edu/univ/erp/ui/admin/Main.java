@@ -1,4 +1,4 @@
-package edu.univ.erp.ui.student;
+package edu.univ.erp.ui.admin;
 
 import com.formdev.flatlaf.FlatLightLaf;
 import edu.univ.erp.api.auth.AuthApi; // <-- 1. ADD THIS IMPORT
@@ -13,7 +13,7 @@ public class Main {
     }
 
     private static void launchUI() {
-        JFrame frame = new JFrame("University ERP — Student");
+        JFrame frame = new JFrame("University ERP — Admin");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1200, 800);
         frame.setLocationRelativeTo(null);

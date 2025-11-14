@@ -1,8 +1,8 @@
-package edu.univ.erp.ui.student;
+package edu.univ.erp.ui.admin;
 
-
-import edu.univ.erp.ui.common.ColorPalette;
 import edu.univ.erp.ui.common.MenuItem;
+import edu.univ.erp.ui.common.ColorPalette;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -13,17 +13,13 @@ import java.util.Map;
 
 public class Sidebar extends JPanel {
 
-    // Functional interface for navigation (callback to dashboard)
     public interface NavController {
         void showPage(String key);
     }
 
     private final NavController controller;
-    private final Map<String, MenuItem> menuItems = new LinkedHashMap<>();
-    private String selectedKey = "";
-
-    private final Color gradientStart = ColorPalette.PRIMARY_START;
-    private final Color gradientEnd = ColorPalette.PRIMARY_END;
+    private final Map<String, JPanel> itemPanels = new LinkedHashMap<>();
+    private String selectedKey = "home";
 
     public Sidebar(NavController controller) {
         this.controller = controller;
@@ -33,7 +29,7 @@ public class Sidebar extends JPanel {
         setBorder(new EmptyBorder(28, 16, 28, 16));
         setOpaque(false);
 
-        JLabel appName = new JLabel("Student Portal");
+        JLabel appName = new JLabel("Admin Panel");
         appName.setFont(new Font("Raleway SemiBold", Font.BOLD, 22));
         appName.setForeground(Color.WHITE);
         appName.setBorder(new EmptyBorder(0, 8, 20, 0));
@@ -41,21 +37,17 @@ public class Sidebar extends JPanel {
         add(appName);
 
         addSection("Navigation");
-
-        addItem("dashboard", "🏠", "Dashboard", true);
-        addItem("catalog", "📚", "Course Catalog", false);
-        addItem("registrations", "📝", "My Registrations", false);
-        addItem("timetable", "📅", "Timetable", false);
-        addItem("grades", "🧮", "Grades", false);
-        addItem("transcript", "📄", "Transcript", false);
-        addItem("profile", "👤", "Profile", false);
+        addItem("home", "🏠", "Dashboard", true);
+        addItem("users", "👥", "Manage Users", false);
+        addItem("courses", "📘", "Manage Courses", false);
+        addItem("sections", "🧩", "Manage Sections", false);
+        addItem("maintenance", "⚙", "Maintenance Mode", false);
 
         add(Box.createVerticalGlue());
         addSection("Account");
         addItem("logout", "🚪", "Logout", false);
     }
 
-    // Adds section headers like "Navigation", "Account"
     private void addSection(String title) {
         JLabel label = new JLabel(title);
         label.setFont(new Font("Raleway", Font.BOLD, 13));
@@ -66,16 +58,15 @@ public class Sidebar extends JPanel {
         add(Box.createVerticalStrut(6));
     }
 
-    // Adds a single clickable item
-        // Adds a single clickable item
     private void addItem(String key, String icon, String text, boolean selected) {
         JPanel itemPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        itemPanel.setOpaque(false);
         MenuItem builder = new MenuItem(itemPanel);
         builder.addMenuItem(text, icon, selected);
 
-        menuItems.put(key, builder); // Store the MenuItem, not the panel
-        add(itemPanel);
+        itemPanels.put(key, itemPanel);
         itemPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        add(itemPanel);
 
         itemPanel.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
@@ -83,43 +74,26 @@ public class Sidebar extends JPanel {
                 setSelected(key);
             }
         });
-
-        if (selected) selectedKey = key;
     }
 
-    // Handles item highlighting
     private void setSelected(String key) {
         selectedKey = key;
-        // Call the new setSelected method on each MenuItem
-        for (Map.Entry<String, MenuItem> entry : menuItems.entrySet()) {
-            entry.getValue().setSelected(entry.getKey().equals(key));
+        for (Map.Entry<String, JPanel> entry : itemPanels.entrySet()) {
+            boolean isSel = entry.getKey().equals(selectedKey);
+            JPanel p = entry.getValue();
+            p.setOpaque(isSel);
+            p.setBackground(isSel ? ColorPalette.SELECT_OVERLAY : ColorPalette.TRANSPARENT);
+            p.repaint();
         }
     }
 
-    // Draws the background gradient
     @Override
     protected void paintComponent(Graphics g) {
-        // 1. Paint the gradient background FIRST.
+        super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
-        GradientPaint gp;
-
-        // (This block is slightly different for student/Sidebar.java)
-        if (this.gradientStart != null) {
-            // This is for student/Sidebar.java
-            gp = new GradientPaint(0, 0, gradientStart, 0, getHeight(), gradientEnd);
-        } else {
-            // This is for admin/Sidebar.java and instructor/Sidebar.java
-            gp = new GradientPaint(0, 0, ColorPalette.PRIMARY_START, 0, getHeight(), ColorPalette.PRIMARY_END);
-        }
-
+        GradientPaint gp = new GradientPaint(0, 0, ColorPalette.PRIMARY_START, 0, getHeight(), ColorPalette.PRIMARY_END);
         g2.setPaint(gp);
         g2.fillRect(0, 0, getWidth(), getHeight());
         g2.dispose();
-
-        // 2. Call super.paintComponent(g) LAST.
-        // Because you called setOpaque(false) in the constructor,
-        // this will NOT erase your gradient. It will just paint
-        // the children (labels, selected items) on top of it.
-        super.paintComponent(g);
     }
 }
