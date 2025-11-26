@@ -260,16 +260,38 @@ public class DashboardPanel extends JPanel {
 
     private JComponent buildGradesPage() {
         JPanel root = pageScaffold("Grades");
-        JTable table = new JTable(
-                new Object[][] {
-                        {"CSE212", "Quiz 1", 18, 20},
-                        {"CSE212", "Midterm", 37, 50},
-                        {"CSE212", "End-Sem", 75, 100},
-                },
-                new Object[] {"Course", "Component", "Score", "Max"}
-        );
+
+        // 1. Fetch Data
+        java.util.List<edu.univ.erp.domain.StudentGradeView> grades = studentApi.getMyGrades();
+
+        // 2. Prepare Table Data
+        String[] columns = {"Course", "Component", "Score", "Max"};
+        DefaultTableModel model = new DefaultTableModel(columns, 0);
+
+        for (edu.univ.erp.domain.StudentGradeView g : grades) {
+            model.addRow(new Object[]{
+                    g.getCourseCode(),
+                    g.getComponent(),
+                    g.getScore(),
+                    g.getMaxScore()
+            });
+        }
+
+        // 3. Create Table
+        JTable table = new JTable(model);
         decorateTable(table);
+
+        // Add a refresh button just in case
+        JButton btnRefresh = new JButton("Refresh Grades");
+        btnRefresh.addActionListener(e -> showPage(PAGE_GRADES)); // Re-loads page
+
         root.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.setOpaque(false);
+        btnPanel.add(btnRefresh);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
         return root;
     }
 

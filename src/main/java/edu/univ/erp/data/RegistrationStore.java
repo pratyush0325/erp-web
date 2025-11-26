@@ -160,4 +160,40 @@ public class RegistrationStore {
             return false;
         }
     }
+
+    /**
+     * Fetches all component grades (Quizzes, Exams) for the student.
+     */
+    public java.util.List<edu.univ.erp.domain.StudentGradeView> getGradesForStudent(int studentId) {
+        java.util.List<edu.univ.erp.domain.StudentGradeView> grades = new java.util.ArrayList<>();
+
+        // Join scores -> assignments -> sections -> courses
+        String query = "SELECT c.code, ca.assignment_name, ss.score_obtained, ca.max_score " +
+                "FROM student_scores ss " +
+                "JOIN course_assignments ca ON ss.assignment_id = ca.assignment_id " +
+                "JOIN sections s ON ca.section_id = s.section_id " +
+                "JOIN courses c ON s.course_id = c.code " +
+                "WHERE ss.student_id = ? " +
+                "ORDER BY c.code, ca.assignment_name";
+
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+             java.sql.PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setInt(1, studentId);
+
+            try (java.sql.ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    grades.add(new edu.univ.erp.domain.StudentGradeView(
+                            rs.getString("code"),
+                            rs.getString("assignment_name"),
+                            rs.getDouble("score_obtained"),
+                            rs.getInt("max_score")
+                    ));
+                }
+            }
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+        }
+        return grades;
+    }
 }

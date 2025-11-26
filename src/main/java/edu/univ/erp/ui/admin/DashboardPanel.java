@@ -18,10 +18,19 @@ public class DashboardPanel extends JPanel {
     // API Instance
     private final AdminApi adminApi = new AdminApi();
 
+    // Table Models
+    private DefaultTableModel userTableModel;
+    private DefaultTableModel courseModel;
+    private DefaultTableModel sectionModel;
+
+    // Tables
+    private JTable userTable;
+
     public DashboardPanel() {
         setLayout(new BorderLayout());
         setBackground(ColorPalette.APP_BG);
 
+        // Add all pages
         cards.add(buildHome(), "home");
         cards.add(buildUsers(), "users");
         cards.add(buildCourses(), "courses");
@@ -33,21 +42,39 @@ public class DashboardPanel extends JPanel {
 
     public void showPage(String key) {
         cardLayout.show(cards, key);
-        // Refresh data when opening the users page
-        if ("users".equals(key)) {
-            refreshUserTable();
-        }
+        // Refresh data when opening specific tabs
+        if ("users".equals(key)) refreshUserTable();
+        if ("courses".equals(key)) refreshCourseTable();
+        if ("sections".equals(key)) refreshSectionTable();
     }
 
-    // --- 1. USER MANAGEMENT UI ---
+    // ---------------------------------------------------------
+    // 1. HOME / DASHBOARD
+    // ---------------------------------------------------------
+    private JComponent buildHome() {
+        JPanel root = scaffold("Admin Dashboard");
+        JPanel grid = new JPanel(new GridLayout(2, 2, 16, 16));
+        grid.setOpaque(false);
+        Icon i1 = UIManager.getIcon("OptionPane.informationIcon");
+        Icon i2 = UIManager.getIcon("OptionPane.warningIcon");
+        Icon i3 = UIManager.getIcon("OptionPane.questionIcon");
+        Icon i4 = UIManager.getIcon("OptionPane.errorIcon");
 
-    private JTable userTable;
-    private DefaultTableModel userTableModel;
+        // Note: These are currently static stats. You can make them dynamic later if needed.
+        grid.add(new StatCard("Total Users", "12", "Admins + Instructors + Students", i1));
+        grid.add(new StatCard("Courses", "30", "Across all departments", i2));
+        grid.add(new StatCard("Sections", "45", "Current semester", i3));
+        grid.add(new StatCard("Maintenance", "OFF", "Toggle available", i4));
+        root.add(grid, BorderLayout.CENTER);
+        return root;
+    }
 
+    // ---------------------------------------------------------
+    // 2. USER MANAGEMENT
+    // ---------------------------------------------------------
     private JComponent buildUsers() {
         JPanel root = scaffold("Manage Users");
 
-        // Table Setup
         String[] columns = {"ID", "Username", "Role", "Status"};
         userTableModel = new DefaultTableModel(columns, 0);
         userTable = new JTable(userTableModel);
@@ -55,7 +82,6 @@ public class DashboardPanel extends JPanel {
 
         root.add(new JScrollPane(userTable), BorderLayout.CENTER);
 
-        // Add User Button
         JButton addBtn = new JButton("Add New User");
         addBtn.addActionListener(e -> showAddUserDialog());
 
@@ -63,9 +89,7 @@ public class DashboardPanel extends JPanel {
         btnPanel.add(addBtn);
         root.add(btnPanel, BorderLayout.SOUTH);
 
-        // Load initial data
         refreshUserTable();
-
         return root;
     }
 
@@ -87,25 +111,20 @@ public class DashboardPanel extends JPanel {
         JPanel form = new JPanel(new GridLayout(0, 2, 10, 10));
         form.setBorder(new EmptyBorder(20, 20, 20, 20));
 
-        // Form Fields
         JTextField txtUser = new JTextField();
         JPasswordField txtPass = new JPasswordField();
         JComboBox<String> comboRole = new JComboBox<>(new String[]{"Student", "Instructor", "Admin"});
-
-        // Dynamic Fields
         JLabel lblExtra1 = new JLabel("Roll No:");
         JTextField txtExtra1 = new JTextField();
         JLabel lblExtra2 = new JLabel("Year:");
         JTextField txtExtra2 = new JTextField();
 
-        // Add components
         form.add(new JLabel("Username:")); form.add(txtUser);
         form.add(new JLabel("Password:")); form.add(txtPass);
         form.add(new JLabel("Role:"));     form.add(comboRole);
         form.add(lblExtra1);               form.add(txtExtra1);
         form.add(lblExtra2);               form.add(txtExtra2);
 
-        // Role Logic
         comboRole.addActionListener(e -> {
             String role = (String) comboRole.getSelectedItem();
             if ("Student".equals(role)) {
@@ -117,35 +136,43 @@ public class DashboardPanel extends JPanel {
                 lblExtra1.setText("Department:");
                 lblExtra1.setVisible(true); txtExtra1.setVisible(true);
                 lblExtra2.setVisible(false); txtExtra2.setVisible(false);
-            } else { // Admin
+            } else {
                 lblExtra1.setVisible(false); txtExtra1.setVisible(false);
                 lblExtra2.setVisible(false); txtExtra2.setVisible(false);
             }
             form.revalidate();
             form.repaint();
         });
-
-        // Trigger initial state
         comboRole.setSelectedIndex(0);
 
         JButton saveBtn = new JButton("Create User");
+        // Background thread to prevent UI freezing
         saveBtn.addActionListener(e -> {
-            String role = (String) comboRole.getSelectedItem();
-            boolean success = adminApi.addUser(
-                    txtUser.getText(),
-                    new String(txtPass.getPassword()),
-                    role.toLowerCase(), // Store as lowercase in DB
-                    txtExtra1.getText(),
-                    txtExtra2.getText()
-            );
+            saveBtn.setEnabled(false);
+            saveBtn.setText("Creating...");
+            String uName = txtUser.getText();
+            String pWord = new String(txtPass.getPassword());
+            String roleVal = (String) comboRole.getSelectedItem();
+            String e1 = txtExtra1.getText();
+            String e2 = txtExtra2.getText();
 
-            if (success) {
-                JOptionPane.showMessageDialog(dialog, "User created successfully!");
-                dialog.dispose();
-                refreshUserTable();
-            } else {
-                JOptionPane.showMessageDialog(dialog, "Error creating user. Check logs.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            new SwingWorker<Boolean, Void>() {
+                @Override protected Boolean doInBackground() {
+                    return adminApi.addUser(uName, pWord, roleVal.toLowerCase(), e1, e2);
+                }
+                @Override protected void done() {
+                    try {
+                        if (get()) {
+                            JOptionPane.showMessageDialog(dialog, "User created successfully!");
+                            dialog.dispose();
+                            refreshUserTable();
+                        } else {
+                            JOptionPane.showMessageDialog(dialog, "Error creating user.", "Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                    } catch (Exception ex) { ex.printStackTrace(); }
+                    if (dialog.isVisible()) { saveBtn.setEnabled(true); saveBtn.setText("Create User"); }
+                }
+            }.execute();
         });
 
         dialog.add(form, BorderLayout.CENTER);
@@ -153,36 +180,169 @@ public class DashboardPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    // --- KEEP YOUR EXISTING METHODS FOR OTHER TABS ---
-
-    private JComponent buildHome() {
-        // ... (Keep existing code from previous turn)
-        JPanel root = scaffold("Admin Dashboard");
-        // ... (Keep the stat cards)
-        return root;
-    }
-
+    // ---------------------------------------------------------
+    // 3. MANAGE COURSES
+    // ---------------------------------------------------------
     private JComponent buildCourses() {
-        // ... (Keep existing code or placeholder)
         JPanel root = scaffold("Manage Courses");
-        // ...
+
+        String[] cols = {"Code", "Title", "Credits"};
+        courseModel = new DefaultTableModel(cols, 0);
+        JTable table = new JTable(courseModel);
+        decorateTable(table);
+
+        JButton btnAdd = new JButton("Create Course");
+        btnAdd.addActionListener(e -> showAddCourseDialog());
+
+        root.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(btnAdd);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
+        refreshCourseTable();
         return root;
     }
 
+    private void refreshCourseTable() {
+        if (courseModel == null) return;
+        courseModel.setRowCount(0);
+        List<edu.univ.erp.domain.Course> list = adminApi.getCourses();
+        for (edu.univ.erp.domain.Course c : list) {
+            courseModel.addRow(new Object[]{c.getCode(), c.getTitle(), c.getCredits()});
+        }
+    }
+
+    private void showAddCourseDialog() {
+        JTextField txtCode = new JTextField();
+        JTextField txtTitle = new JTextField();
+        JTextField txtCredits = new JTextField("3");
+
+        Object[] message = {
+                "Course Code (e.g. CS101):", txtCode,
+                "Course Title:", txtTitle,
+                "Credits:", txtCredits
+        };
+
+        int option = JOptionPane.showConfirmDialog(this, message, "Add Course", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.OK_OPTION) {
+            try {
+                int credits = Integer.parseInt(txtCredits.getText());
+                boolean ok = adminApi.addCourse(txtCode.getText(), txtTitle.getText(), credits);
+                if (ok) {
+                    JOptionPane.showMessageDialog(this, "Course Added!");
+                    refreshCourseTable();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Error adding course (Duplicate code?)");
+                }
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Invalid credits.");
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 4. MANAGE SECTIONS
+    // ---------------------------------------------------------
     private JComponent buildSections() {
-        // ... (Keep existing code or placeholder)
         JPanel root = scaffold("Manage Sections");
-        // ...
+
+        String[] cols = {"ID", "Course", "Instructor", "Schedule", "Capacity"};
+        sectionModel = new DefaultTableModel(cols, 0);
+        JTable table = new JTable(sectionModel);
+        decorateTable(table);
+
+        JButton btnAdd = new JButton("Schedule Section");
+        btnAdd.addActionListener(e -> showAddSectionDialog());
+
+        root.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(btnAdd);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
+        refreshSectionTable();
         return root;
     }
 
+    private void refreshSectionTable() {
+        if (sectionModel == null) return;
+        sectionModel.setRowCount(0);
+        List<edu.univ.erp.domain.SectionAdminItem> list = adminApi.getSections();
+        for (edu.univ.erp.domain.SectionAdminItem s : list) {
+            sectionModel.addRow(new Object[]{
+                    s.getSectionId(), s.getCourseCode(), s.getInstructorName(), s.getSchedule(), s.getCapacity()
+            });
+        }
+    }
+
+    private void showAddSectionDialog() {
+        List<edu.univ.erp.domain.Course> courses = adminApi.getCourses();
+        java.util.Map<Integer, String> instructors = adminApi.getInstructors();
+
+        if (courses.isEmpty() || instructors.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please ensure you have Courses and Instructors created first.");
+            return;
+        }
+
+        JComboBox<edu.univ.erp.domain.Course> comboCourse = new JComboBox<>(courses.toArray(new edu.univ.erp.domain.Course[0]));
+
+        class InstructorOption {
+            final int id; final String name;
+            InstructorOption(int id, String name) { this.id = id; this.name = name; }
+            public String toString() { return name; }
+        }
+
+        JComboBox<InstructorOption> comboInst = new JComboBox<>();
+        instructors.forEach((id, name) -> comboInst.addItem(new InstructorOption(id, name)));
+
+        JTextField txtTime = new JTextField("Mon 10:00");
+        JTextField txtRoom = new JTextField("101");
+        JTextField txtCap = new JTextField("60");
+
+        Object[] msg = {
+                "Course:", comboCourse,
+                "Instructor:", comboInst,
+                "Day/Time:", txtTime,
+                "Room:", txtRoom,
+                "Capacity:", txtCap
+        };
+
+        int opt = JOptionPane.showConfirmDialog(this, msg, "Schedule Section", JOptionPane.OK_CANCEL_OPTION);
+        if (opt == JOptionPane.OK_OPTION) {
+            try {
+                edu.univ.erp.domain.Course c = (edu.univ.erp.domain.Course) comboCourse.getSelectedItem();
+                InstructorOption i = (InstructorOption) comboInst.getSelectedItem();
+                int cap = Integer.parseInt(txtCap.getText());
+
+                boolean ok = adminApi.addSection(c.getCode(), i.id, txtTime.getText(), txtRoom.getText(), cap);
+                if (ok) {
+                    JOptionPane.showMessageDialog(this, "Section Scheduled!");
+                    refreshSectionTable();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Error scheduling section.");
+                }
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Invalid input.");
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 5. MAINTENANCE
+    // ---------------------------------------------------------
     private JComponent buildMaintenance() {
-        // ... (Keep existing code or placeholder)
         JPanel root = scaffold("Maintenance Mode");
-        // ...
+        JCheckBox toggle = new JCheckBox("Enable Maintenance Mode");
+        toggle.setFont(new Font("Raleway", Font.BOLD, 14));
+        root.add(toggle, BorderLayout.NORTH);
+        // Logic to be added later
         return root;
     }
 
+    // ---------------------------------------------------------
+    // HELPERS
+    // ---------------------------------------------------------
     private JPanel scaffold(String heading) {
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(ColorPalette.APP_BG);

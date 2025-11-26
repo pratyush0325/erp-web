@@ -1,12 +1,8 @@
 package edu.univ.erp.domain;
 
-/**
- * A simple data class representing one row in the course catalog.
- * This is a "domain" object.
- */
 public class CatalogItem {
 
-    private int sectionId = 0; // <-- ADD THIS
+    private int sectionId;
     private final String code;
     private final String title;
     private final int credits;
@@ -14,7 +10,7 @@ public class CatalogItem {
     private final int capacity;
 
     public CatalogItem(int sectionId, String code, String title, int credits, String instructorName, int capacity) {
-        this.sectionId = this.sectionId; // <-- ADD THIS
+        this.sectionId = sectionId; // <--- FIXED (removed "this." from the right side)
         this.code = code;
         this.title = title;
         this.credits = credits;
@@ -23,7 +19,7 @@ public class CatalogItem {
     }
 
     // --- Getters ---
-    public int getSectionId() { return sectionId; } // <-- ADD THIS
+    public int getSectionId() { return sectionId; }
     public String getCode() { return code; }
     public String getTitle() { return title; }
     public int getCredits() { return credits; }

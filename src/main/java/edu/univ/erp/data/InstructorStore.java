@@ -117,22 +117,28 @@ public class InstructorStore {
     // Fetch all assignments for a course
     public List<AssignmentScore> getAssignmentsForSection(int sectionId) {
         List<AssignmentScore> list = new ArrayList<>();
-        String query = "SELECT assignment_id, assignment_name, max_score FROM course_assignments WHERE section_id = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+        // FIXED: Added ", weight_percent" to the SELECT list
+        String query = "SELECT assignment_id, assignment_name, max_score, weight_percent FROM course_assignments WHERE section_id = ?";
+
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+             java.sql.PreparedStatement stmt = conn.prepareStatement(query)) {
+
             stmt.setInt(1, sectionId);
-            try (ResultSet rs = stmt.executeQuery()) {
+
+            try (java.sql.ResultSet rs = stmt.executeQuery()) {
                 while(rs.next()) {
                     list.add(new AssignmentScore(
                             rs.getInt("assignment_id"),
                             rs.getString("assignment_name"),
                             rs.getInt("max_score"),
-                            rs.getInt("weight_percent"),
-                            null // No student score here, this is just the definition
+                            rs.getInt("weight_percent"), // Now this will work!
+                            null
                     ));
                 }
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+        }
         return list;
     }
 

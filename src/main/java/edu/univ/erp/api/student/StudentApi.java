@@ -52,4 +52,9 @@ public class StudentApi {
         // Call the "brain" to perform the logic
         return studentService.dropStudent(currentStudentId, sectionId);
     }
+
+    public java.util.List<edu.univ.erp.domain.StudentGradeView> getMyGrades() {
+        int studentId = edu.univ.erp.auth.session.UserSession.getInstance().getUserId();
+        return registrationStore.getGradesForStudent(studentId);
+    }
 }

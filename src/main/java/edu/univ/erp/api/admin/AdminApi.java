@@ -15,4 +15,24 @@ public class AdminApi {
     public boolean addUser(String username, String password, String role, String extra1, String extra2) {
         return adminStore.addUser(username, password, role, extra1, extra2);
     }
+
+    public List<edu.univ.erp.domain.Course> getCourses() {
+        return adminStore.getAllCourses();
+    }
+
+    public boolean addCourse(String code, String title, int credits) {
+        return adminStore.addCourse(code, title, credits);
+    }
+
+    public List<edu.univ.erp.domain.SectionAdminItem> getSections() {
+        return adminStore.getAllSections();
+    }
+
+    public boolean addSection(String courseId, int instructorId, String dayTime, String room, int capacity) {
+        return adminStore.addSection(courseId, instructorId, dayTime, room, capacity);
+    }
+
+    public java.util.Map<Integer, String> getInstructors() {
+        return adminStore.getInstructorsMap();
+    }
 }
