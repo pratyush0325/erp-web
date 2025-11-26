@@ -78,4 +78,29 @@ public class AdminStore {
             try { if (connErp != null) connErp.close(); } catch (SQLException ex) { ex.printStackTrace(); }
         }
     }
+
+    /**
+     * Fetches all users from the auth database for the admin list.
+     */
+    public java.util.List<edu.univ.erp.domain.UserAdminItem> getAllUsers() {
+        java.util.List<edu.univ.erp.domain.UserAdminItem> users = new java.util.ArrayList<>();
+        String query = "SELECT user_id, username, role, status FROM users_auth ORDER BY user_id DESC";
+
+        try (Connection conn = DriverManager.getConnection(dbUrlAuth, dbUser, dbPassword);
+             PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                users.add(new edu.univ.erp.domain.UserAdminItem(
+                        rs.getInt("user_id"),
+                        rs.getString("username"),
+                        rs.getString("role"),
+                        rs.getString("status")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return users;
+    }
 }
