@@ -11,7 +11,7 @@ public class AuthStore {
 
     private String dbUrl = "jdbc:mysql://localhost:3306/auth_db";
     private String dbUser = "root";
-    private String dbPassword = "password";
+    private String dbPassword = "prabhi12";
 
     /**
      * Fetches a user's auth details from the database.

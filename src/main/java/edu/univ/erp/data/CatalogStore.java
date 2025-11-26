@@ -14,7 +14,7 @@ public class CatalogStore {
     // Connection details for the ERP database
     private String dbUrl = "jdbc:mysql://localhost:3306/erp_db";
     private String dbUser = "root";
-    private String dbPassword = "password";
+    private String dbPassword = "prabhi12";
 
     /**
      * Fetches the complete course catalog by joining sections, courses,

@@ -13,7 +13,7 @@ public class RegistrationStore {
 
     private String dbUrl = "jdbc:mysql://localhost:3306/erp_db";
     private String dbUser = "root";
-    private String dbPassword = "password";
+    private String dbPassword = "prabhi12";
 
     /**
      * Fetches all registered sections for a specific student.

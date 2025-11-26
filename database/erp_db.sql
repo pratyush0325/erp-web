@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS students (
 CREATE TABLE IF NOT EXISTS instructors (
     user_id INT PRIMARY KEY,
     department VARCHAR(50) NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES auth_db.users_auth(user_id)
+    FOREIGN KEY (user_id) REFERENCES auth_db.   users_auth(user_id)
 );
 
 CREATE TABLE IF NOT EXISTS courses (
