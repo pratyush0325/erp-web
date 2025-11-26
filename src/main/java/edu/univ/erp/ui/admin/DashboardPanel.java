@@ -333,10 +333,37 @@ public class DashboardPanel extends JPanel {
     // ---------------------------------------------------------
     private JComponent buildMaintenance() {
         JPanel root = scaffold("Maintenance Mode");
+
+        // 1. Create Checkbox
         JCheckBox toggle = new JCheckBox("Enable Maintenance Mode");
-        toggle.setFont(new Font("Raleway", Font.BOLD, 14));
-        root.add(toggle, BorderLayout.NORTH);
-        // Logic to be added later
+        toggle.setFont(new Font("Raleway", Font.BOLD, 16));
+        toggle.setOpaque(false);
+
+        // 2. Set initial state from DB
+        toggle.setSelected(adminApi.isMaintenanceOn());
+
+        // 3. Add Listener
+        toggle.addActionListener(e -> {
+            boolean isSelected = toggle.isSelected();
+            adminApi.setMaintenance(isSelected);
+
+            String status = isSelected ? "ON" : "OFF";
+            JOptionPane.showMessageDialog(this, "Maintenance Mode is now " + status);
+        });
+
+        // Layout
+        JPanel content = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        content.setOpaque(false);
+        content.add(toggle);
+
+        JTextArea hint = new JTextArea("When enabled:\n- Students cannot register/drop.\n- Instructors cannot edit grades.\n- A banner will be shown to all users.");
+        hint.setEditable(false);
+        hint.setOpaque(false);
+        hint.setBorder(new EmptyBorder(10, 10, 10, 10));
+        hint.setForeground(Color.DARK_GRAY);
+
+        root.add(content, BorderLayout.CENTER);
+        root.add(hint, BorderLayout.SOUTH);
         return root;
     }
 

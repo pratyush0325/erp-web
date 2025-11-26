@@ -35,4 +35,13 @@ public class AdminApi {
     public java.util.Map<Integer, String> getInstructors() {
         return adminStore.getInstructorsMap();
     }
+
+    // --- MAINTENANCE ---
+    public boolean isMaintenanceOn() {
+        return edu.univ.erp.api.maintenance.MaintenanceApi.isMaintenanceOn();
+    }
+
+    public void setMaintenance(boolean on) {
+        edu.univ.erp.api.maintenance.MaintenanceApi.setMaintenance(on);
+    }
 }

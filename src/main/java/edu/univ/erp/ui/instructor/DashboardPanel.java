@@ -14,12 +14,17 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
 
+import edu.univ.erp.api.maintenance.MaintenanceApi;
+import edu.univ.erp.ui.common.ColorPalette;
+
 public class DashboardPanel extends JPanel {
 
     private final InstructorApi api = new InstructorApi();
     private JPanel contentPanel;
 
-    // Defines whether we are just looking at the list or trying to grade
+    // --- NEW: Maintenance Banner ---
+    private final JPanel maintenanceBanner = new JPanel(new BorderLayout());
+
     private enum ViewMode {
         ROSTER_ONLY,
         GRADING
@@ -27,6 +32,18 @@ public class DashboardPanel extends JPanel {
 
     public DashboardPanel() {
         setLayout(new BorderLayout());
+
+        // --- 1. Setup Maintenance Banner (Hidden by default) ---
+        maintenanceBanner.setBackground(ColorPalette.MAINT_BG);
+        JLabel bannerText = new JLabel("Maintenance Mode is ON — Grading and changes are disabled.");
+        bannerText.setBorder(new EmptyBorder(8, 16, 8, 16));
+        bannerText.setForeground(ColorPalette.MAINT_TXT);
+        bannerText.setFont(new Font("Raleway", Font.BOLD, 13));
+        maintenanceBanner.add(bannerText, BorderLayout.CENTER);
+        maintenanceBanner.setVisible(false);
+        add(maintenanceBanner, BorderLayout.NORTH);
+        // -------------------------------------------------------
+
         contentPanel = new JPanel(new BorderLayout());
         add(contentPanel, BorderLayout.CENTER);
 
@@ -36,6 +53,11 @@ public class DashboardPanel extends JPanel {
 
     // --- MAIN NAVIGATION ROUTER ---
     public void showPage(String key) {
+        // --- 2. Check Status on every page load ---
+        boolean isMaint = MaintenanceApi.isMaintenanceOn();
+        maintenanceBanner.setVisible(isMaint);
+        // ------------------------------------------
+
         switch (key.toLowerCase()) {
             case "home":
             case "dashboard":
@@ -56,6 +78,8 @@ public class DashboardPanel extends JPanel {
                 break;
         }
     }
+
+
 
     // ==========================================
     // 1. OVERVIEW (HOME)
@@ -260,7 +284,7 @@ public class DashboardPanel extends JPanel {
         // --- BUTTONS ---
         JButton btnBack = new JButton("Back");
         JButton btnEnterMark = new JButton("Enter Mark");
-        JButton btnAddComponent = new JButton("Add Component"); // New Button!
+        JButton btnAddComponent = new JButton("Add Component");
 
         btnEnterMark.setEnabled(false);
 
@@ -270,6 +294,13 @@ public class DashboardPanel extends JPanel {
 
         // Logic: Add Component
         btnAddComponent.addActionListener(e -> {
+            // --- 1. BLOCK IF MAINTENANCE IS ON ---
+            if (MaintenanceApi.isMaintenanceOn()) {
+                JOptionPane.showMessageDialog(root, "System is under maintenance. You cannot add components.", "Blocked", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            // -------------------------------------
+
             JTextField nameField = new JTextField();
             JTextField maxField = new JTextField("100");
             JTextField weightField = new JTextField("20");
@@ -291,6 +322,8 @@ public class DashboardPanel extends JPanel {
                     if (success) {
                         JOptionPane.showMessageDialog(root, "Component Added!");
                         showComponentGradebook(sectionId, courseName); // Refresh to show new column
+                    } else {
+                        JOptionPane.showMessageDialog(root, "Failed to add component.");
                     }
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(root, "Invalid input. Please enter numbers for Max and Weight.");
@@ -300,6 +333,13 @@ public class DashboardPanel extends JPanel {
 
         // Logic: Enter Mark
         btnEnterMark.addActionListener(e -> {
+            // --- 2. BLOCK IF MAINTENANCE IS ON ---
+            if (MaintenanceApi.isMaintenanceOn()) {
+                JOptionPane.showMessageDialog(root, "System is under maintenance. You cannot enter grades.", "Blocked", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            // -------------------------------------
+
             int row = table.getSelectedRow();
             int col = table.getSelectedColumn();
 
@@ -339,7 +379,7 @@ public class DashboardPanel extends JPanel {
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         btnPanel.add(btnBack);
-        btnPanel.add(btnAddComponent); // Add to panel
+        btnPanel.add(btnAddComponent);
         btnPanel.add(btnEnterMark);
 
         root.add(new JScrollPane(table), BorderLayout.CENTER);

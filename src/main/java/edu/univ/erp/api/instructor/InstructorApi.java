@@ -1,5 +1,6 @@
 package edu.univ.erp.api.instructor;
 
+import edu.univ.erp.api.maintenance.MaintenanceApi; // <--- Import
 import edu.univ.erp.auth.session.UserSession;
 import edu.univ.erp.data.InstructorStore;
 import edu.univ.erp.domain.AssignmentScore;
@@ -16,12 +17,14 @@ public class InstructorApi {
         return instructorStore.getCoursesByInstructorId(instructorId);
     }
 
-
     public List<StudentGradeItem> getClassList(int sectionId) {
         return instructorStore.getStudentsBySectionId(sectionId);
     }
 
+    // --- WRITE OPERATIONS (Blocked in Maintenance) ---
+
     public boolean assignGrade(int studentId, int sectionId, String grade) {
+        if (MaintenanceApi.isMaintenanceOn()) return false; // <--- BLOCK
         return instructorStore.updateGrade(studentId, sectionId, grade);
     }
 
@@ -34,10 +37,12 @@ public class InstructorApi {
     }
 
     public boolean updateComponentScore(int assignmentId, int studentId, double score) {
+        if (MaintenanceApi.isMaintenanceOn()) return false; // <--- BLOCK
         return instructorStore.updateStudentScore(assignmentId, studentId, score);
     }
 
     public boolean createAssignment(int sectionId, String name, int maxScore, int weight) {
+        if (MaintenanceApi.isMaintenanceOn()) return false; // <--- BLOCK
         return instructorStore.addAssignment(sectionId, name, maxScore, weight);
     }
 }

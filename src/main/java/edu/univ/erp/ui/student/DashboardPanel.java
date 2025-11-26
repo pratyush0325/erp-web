@@ -75,6 +75,11 @@ public class DashboardPanel extends JPanel {
     }
 
     public void showPage(String key) {
+        // 1. Check Maintenance Status
+        boolean isMaint = edu.univ.erp.api.maintenance.MaintenanceApi.isMaintenanceOn();
+        setMaintenanceMode(isMaint);
+
+        // 2. Show the requested card
         cardLayout.show(cards, key);
     }
 
@@ -166,6 +171,10 @@ public class DashboardPanel extends JPanel {
             int messageType;
 
             switch (status) {
+                case MAINTENANCE_MODE:
+                    message = "System is under maintenance. Registration is disabled.";
+                    messageType = JOptionPane.WARNING_MESSAGE;
+                    break;
                 case SUCCESS:
                     message = "Successfully registered for the course!";
                     messageType = JOptionPane.INFORMATION_MESSAGE;
@@ -221,6 +230,10 @@ public class DashboardPanel extends JPanel {
             int messageType;
 
             switch (status) {
+                case MAINTENANCE_MODE:
+                    message = "System is under maintenance. You cannot drop courses now.";
+                    messageType = JOptionPane.WARNING_MESSAGE;
+                    break;
                 case SUCCESS:
                     message = "Successfully dropped the section.";
                     messageType = JOptionPane.INFORMATION_MESSAGE;
@@ -261,12 +274,12 @@ public class DashboardPanel extends JPanel {
     private JComponent buildGradesPage() {
         JPanel root = pageScaffold("Grades");
 
-        // 1. Fetch Data
+        // 1. Fetch Real Data
         java.util.List<edu.univ.erp.domain.StudentGradeView> grades = studentApi.getMyGrades();
 
         // 2. Prepare Table Data
         String[] columns = {"Course", "Component", "Score", "Max"};
-        DefaultTableModel model = new DefaultTableModel(columns, 0);
+        javax.swing.table.DefaultTableModel model = new javax.swing.table.DefaultTableModel(columns, 0);
 
         for (edu.univ.erp.domain.StudentGradeView g : grades) {
             model.addRow(new Object[]{
@@ -277,20 +290,14 @@ public class DashboardPanel extends JPanel {
             });
         }
 
-        // 3. Create Table
         JTable table = new JTable(model);
         decorateTable(table);
-
-        // Add a refresh button just in case
-        JButton btnRefresh = new JButton("Refresh Grades");
-        btnRefresh.addActionListener(e -> showPage(PAGE_GRADES)); // Re-loads page
-
         root.add(new JScrollPane(table), BorderLayout.CENTER);
 
-        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        btnPanel.setOpaque(false);
-        btnPanel.add(btnRefresh);
-        root.add(btnPanel, BorderLayout.SOUTH);
+        // Add refresh button
+        JButton btnRefresh = new JButton("Refresh");
+        btnRefresh.addActionListener(e -> showPage(PAGE_GRADES));
+        root.add(btnRefresh, BorderLayout.SOUTH);
 
         return root;
     }
