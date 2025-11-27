@@ -18,7 +18,8 @@ public class Sidebar extends JPanel {
     }
 
     private final NavController controller;
-    private final Map<String, JPanel> itemPanels = new LinkedHashMap<>();
+    // FIX: Change Map to store MenuItem, not JPanel
+    private final Map<String, MenuItem> itemPanels = new LinkedHashMap<>();
     private String selectedKey = "home";
 
     public Sidebar(NavController controller) {
@@ -36,15 +37,14 @@ public class Sidebar extends JPanel {
         appName.setAlignmentX(Component.LEFT_ALIGNMENT);
         add(appName);
 
-        addSection("Navigation");
-
+//        addSection("Navigation");
         addItem("home",  "Dashboard", true);
         addItem("sections", "My Sections", false);
         addItem("grades",  "Gradebook", false);
         addItem("stats","Statistics", false);
 
         add(Box.createVerticalGlue());
-        addSection("Account");
+//        addSection("Account");
         addItem("logout","Logout", false);
     }
 
@@ -59,31 +59,24 @@ public class Sidebar extends JPanel {
     }
 
     private void addItem(String key, String text, boolean selected) {
-        // --- FIX: Robust Custom JPanel ---
+        // --- FIX: Custom JPanel that clears artifacts ---
         JPanel itemPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10)) {
             @Override
             protected void paintComponent(Graphics g) {
-                // 1. Clear the area first (Important!)
-                // This prevents "ghosting" of old text
                 super.paintComponent(g);
-
-                // 2. Paint our custom background (white overlay)
-                // Use the correct color based on opacity/selection
-                Color bg = getBackground();
-                g.setColor(bg);
+                g.setColor(getBackground());
                 g.fillRect(0, 0, getWidth(), getHeight());
             }
         };
-        // ---------------------------------
 
-        // We still need this to be false so the parent's gradient shows up
+        // This MUST be false
         itemPanel.setOpaque(false);
 
         MenuItem builder = new MenuItem(itemPanel);
         builder.addMenuItem(text, selected);
 
-        itemPanels.put(key, builder); // Note: For Admin/Instructor, this map name might be 'itemPanels'
-        // If your variable is 'itemPanels', change 'menuItems' to 'itemPanels' here.
+        // Store the MenuItem wrapper
+        itemPanels.put(key, builder);
 
         itemPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         add(itemPanel);
@@ -92,8 +85,6 @@ public class Sidebar extends JPanel {
             @Override public void mouseClicked(MouseEvent e) {
                 if (controller != null) controller.showPage(key);
                 setSelected(key);
-
-                // Force a repaint of the whole sidebar to clear artifacts
                 revalidate();
                 repaint();
             }
@@ -104,22 +95,23 @@ public class Sidebar extends JPanel {
 
     private void setSelected(String key) {
         selectedKey = key;
-        for (Map.Entry<String, JPanel> entry : itemPanels.entrySet()) {
+        // FIX: Update using MenuItem methods
+        for (Map.Entry<String, MenuItem> entry : itemPanels.entrySet()) {
             boolean isSel = entry.getKey().equals(selectedKey);
-            JPanel p = entry.getValue();
-            p.setOpaque(isSel);
-            p.setBackground(isSel ? ColorPalette.SELECT_OVERLAY : ColorPalette.TRANSPARENT);
-            p.repaint();
+            entry.getValue().setSelected(isSel);
         }
     }
 
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
+        // Paint Gradient
         Graphics2D g2 = (Graphics2D) g.create();
         GradientPaint gp = new GradientPaint(0, 0, ColorPalette.PRIMARY_START, 0, getHeight(), ColorPalette.PRIMARY_END);
         g2.setPaint(gp);
         g2.fillRect(0, 0, getWidth(), getHeight());
         g2.dispose();
+
+        // Paint children on top
+        super.paintComponent(g);
     }
 }
