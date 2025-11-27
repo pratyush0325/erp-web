@@ -19,8 +19,8 @@ public class AuthStore {
      * @return A UserAuth object if found, otherwise null.
      */
     public UserAuth findUserByUsername(String username) {
-        // Updated query to fetch new columns
-        String query = "SELECT user_id, username, role, password_hash, failed_attempts, lockout_until FROM users_auth WHERE username = ?";
+        // UPDATED QUERY: Added 'status'
+        String query = "SELECT user_id, username, role, password_hash, failed_attempts, lockout_until, status FROM users_auth WHERE username = ?";
 
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
              PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -33,8 +33,9 @@ public class AuthStore {
                             rs.getString("username"),
                             rs.getString("role"),
                             rs.getString("password_hash"),
-                            rs.getInt("failed_attempts"),    // <--- New
-                            rs.getTimestamp("lockout_until") // <--- New
+                            rs.getInt("failed_attempts"),
+                            rs.getTimestamp("lockout_until"),
+                            rs.getString("status") // <--- Pass to constructor
                     );
                 }
             }
@@ -77,7 +78,8 @@ public class AuthStore {
     }
 
     public UserAuth findUserById(int userId) {
-        String query = "SELECT user_id, username, role, password_hash, failed_attempts, lockout_until FROM users_auth WHERE user_id = ?";
+        String query = "SELECT user_id, username, role, password_hash, failed_attempts, lockout_until, status FROM users_auth WHERE user_id = ?";
+        // ... (Same update inside the try-catch block as above) ...
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
              PreparedStatement stmt = conn.prepareStatement(query)) {
 
@@ -90,7 +92,8 @@ public class AuthStore {
                             rs.getString("role"),
                             rs.getString("password_hash"),
                             rs.getInt("failed_attempts"),
-                            rs.getTimestamp("lockout_until")
+                            rs.getTimestamp("lockout_until"),
+                            rs.getString("status") // <--- Pass to constructor
                     );
                 }
             }

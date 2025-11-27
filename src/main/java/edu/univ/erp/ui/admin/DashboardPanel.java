@@ -186,8 +186,37 @@ public class DashboardPanel extends JPanel {
             }
         });
 
+        // NEW: Toggle Status Button
+        JButton btnToggle = new JButton("Activate/Deactivate");
+        btnToggle.addActionListener(e -> {
+            int row = userTable.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a user.");
+                return;
+            }
+
+            int userId = (int) userTable.getValueAt(row, 0);
+            String currentStatus = (String) userTable.getValueAt(row, 3);
+
+            // Prevent disabling self
+            int currentUserId = edu.univ.erp.auth.session.UserSession.getInstance().getUserId();
+            if (userId == currentUserId) {
+                JOptionPane.showMessageDialog(this, "You cannot deactivate your own account!");
+                return;
+            }
+
+            if (adminApi.toggleUserStatus(userId, currentStatus)) {
+                refreshUserTable(); // Refresh to see the change
+            } else {
+                JOptionPane.showMessageDialog(this, "Failed to update status.");
+            }
+        });
+
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        btnPanel.add(delBtn); // Add Delete
+        // --- THIS WAS MISSING BEFORE ---
+        btnPanel.add(btnToggle);
+        // -------------------------------
+        btnPanel.add(delBtn);
         btnPanel.add(addBtn);
         root.add(btnPanel, BorderLayout.SOUTH);
 
@@ -207,7 +236,7 @@ public class DashboardPanel extends JPanel {
     private void showAddUserDialog() {
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Add New User", true);
         dialog.setLayout(new BorderLayout());
-        dialog.setSize(400, 400); // Made slightly taller
+        dialog.setSize(400, 400);
         dialog.setLocationRelativeTo(this);
 
         JPanel form = new JPanel(new GridLayout(0, 2, 10, 10));
@@ -224,8 +253,8 @@ public class DashboardPanel extends JPanel {
         JLabel lblExtra2 = new JLabel("Year:");
         JTextField txtExtra2 = new JTextField();
 
-        JLabel lblExtra3 = new JLabel("Program:"); // <--- NEW FIELD
-        JTextField txtExtra3 = new JTextField(); // <--- NEW FIELD
+        JLabel lblExtra3 = new JLabel("Program:");
+        JTextField txtExtra3 = new JTextField();
 
         // Add to form
         form.add(new JLabel("Username:")); form.add(txtUser);
@@ -242,14 +271,11 @@ public class DashboardPanel extends JPanel {
             if ("Student".equals(role)) {
                 lblExtra1.setText("Roll No:");
                 lblExtra1.setVisible(true); txtExtra1.setVisible(true);
-
                 lblExtra2.setVisible(true); txtExtra2.setVisible(true); // Year
-
                 lblExtra3.setVisible(true); txtExtra3.setVisible(true); // Program
             } else if ("Instructor".equals(role)) {
                 lblExtra1.setText("Department:");
                 lblExtra1.setVisible(true); txtExtra1.setVisible(true);
-
                 lblExtra2.setVisible(false); txtExtra2.setVisible(false);
                 lblExtra3.setVisible(false); txtExtra3.setVisible(false);
             } else { // Admin
@@ -260,19 +286,54 @@ public class DashboardPanel extends JPanel {
             form.revalidate();
             form.repaint();
         });
-        comboRole.setSelectedIndex(0); // Trigger default (Student)
+        comboRole.setSelectedIndex(0); // Trigger default
 
         JButton saveBtn = new JButton("Create User");
         saveBtn.addActionListener(e -> {
+            String uName = txtUser.getText().trim();
+            String pWord = new String(txtPass.getPassword()).trim();
+            String roleVal = (String) comboRole.getSelectedItem();
+            String e1 = txtExtra1.getText().trim();
+            String e2 = txtExtra2.getText().trim();
+            String e3 = txtExtra3.getText().trim();
+
+            // --- VALIDATION CHECKS ---
+            if (uName.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Username cannot be empty.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (pWord.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Password cannot be empty.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Role Specific Checks
+            if ("Student".equals(roleVal)) {
+                if (e1.isEmpty()) {
+                    JOptionPane.showMessageDialog(dialog, "Roll Number is required.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                if (e3.isEmpty()) {
+                    JOptionPane.showMessageDialog(dialog, "Program is required.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                // Validate Year is a number
+                try {
+                    Integer.parseInt(e2);
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(dialog, "Year must be a number.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+            } else if ("Instructor".equals(roleVal)) {
+                if (e1.isEmpty()) {
+                    JOptionPane.showMessageDialog(dialog, "Department is required.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+            }
+            // -------------------------
+
             saveBtn.setEnabled(false);
             saveBtn.setText("Creating...");
-
-            String uName = txtUser.getText();
-            String pWord = new String(txtPass.getPassword());
-            String roleVal = (String) comboRole.getSelectedItem();
-            String e1 = txtExtra1.getText();
-            String e2 = txtExtra2.getText();
-            String e3 = txtExtra3.getText(); // Program
 
             new SwingWorker<Boolean, Void>() {
                 @Override protected Boolean doInBackground() {
@@ -285,7 +346,8 @@ public class DashboardPanel extends JPanel {
                             dialog.dispose();
                             refreshUserTable();
                         } else {
-                            JOptionPane.showMessageDialog(dialog, "Error creating user.", "Error", JOptionPane.ERROR_MESSAGE);
+                            // This covers Duplicate Username OR Duplicate Roll No
+                            JOptionPane.showMessageDialog(dialog, "Error creating user.\n(Username or Roll No may already exist).", "Error", JOptionPane.ERROR_MESSAGE);
                         }
                     } catch (Exception ex) { ex.printStackTrace(); }
                     if (dialog.isVisible()) { saveBtn.setEnabled(true); saveBtn.setText("Create User"); }

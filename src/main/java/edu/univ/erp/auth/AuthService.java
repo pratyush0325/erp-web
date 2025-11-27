@@ -22,6 +22,11 @@ public class AuthService {
             return new LoginResult(LoginStatus.USER_NOT_FOUND, null, 0);
         }
 
+        // --- NEW: Check Status ---
+        if (!"Active".equalsIgnoreCase(user.getStatus())) {
+            return new LoginResult(LoginStatus.ACCOUNT_INACTIVE, null, 0);
+        }
+
         // 1. CHECK LOCKOUT STATUS
         if (user.getLockoutUntil() != null) {
             long now = System.currentTimeMillis();

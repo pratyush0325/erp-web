@@ -86,6 +86,10 @@ public class PanelLogin extends JPanel {
                     unlockTimer.start();
                     // ------------------------------------------------
                     break;
+                case ACCOUNT_INACTIVE:
+                    lblMessage.setText("Account Inactive. Please contact Admin.");
+                    lblMessage.setForeground(Color.RED);
+                    break;
                 default:
                     lblMessage.setText("Error: An unknown error occurred.");
                     lblMessage.setForeground(Color.RED);

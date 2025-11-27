@@ -76,4 +76,9 @@ public class AdminApi {
     public boolean addSection(String courseId, int instructorId, String dayTime, String room, int capacity, String semester, int year) {
         return adminStore.addSection(courseId, instructorId, dayTime, room, capacity, semester, year);
     }
+
+    public boolean toggleUserStatus(int userId, String currentStatus) {
+        String newStatus = "Active".equalsIgnoreCase(currentStatus) ? "Inactive" : "Active";
+        return adminStore.updateUserStatus(userId, newStatus);
+    }
 }

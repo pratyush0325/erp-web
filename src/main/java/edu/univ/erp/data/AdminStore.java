@@ -188,6 +188,18 @@ public class AdminStore {
         }
     }
 
+    public boolean updateUserStatus(int userId, String newStatus) {
+        String query = "UPDATE users_auth SET status = ? WHERE user_id = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrlAuth, dbUser, dbPassword);
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, newStatus);
+            stmt.setInt(2, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 
     // Helper to populate Instructor dropdown
     public java.util.Map<Integer, String> getInstructorsMap() {
