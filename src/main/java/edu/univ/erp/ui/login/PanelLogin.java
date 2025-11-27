@@ -51,15 +51,13 @@ public class PanelLogin extends JPanel {
             String password = new String(txtPassword.getPassword());
 
             // --- API Call ---
-            // This is the clean separation. The UI calls the API and gets a simple result.
             LoginResult result = authApi.attemptLogin(username, password);
 
             // --- Handle Result ---
             switch (result.getStatus()) {
                 case SUCCESS:
                     lblMessage.setText("Login Successful! Launching...");
-                    lblMessage.setForeground(new Color(7, 2, 2)); // Green text
-                    // Launch the correct dashboard and close this login window
+                    lblMessage.setForeground(new Color(0, 128, 0)); // Dark Green
                     launchDashboard(result.getRole());
                     break;
                 case USER_NOT_FOUND:
@@ -67,8 +65,26 @@ public class PanelLogin extends JPanel {
                     lblMessage.setForeground(Color.RED);
                     break;
                 case INVALID_PASSWORD:
-                    lblMessage.setText("Error: Invalid username or password.");
+                    // Show remaining attempts (requires updated LoginResult class)
+                    int tries = result.getRemainingAttempts();
+                    if (tries >= 0) {
+                        lblMessage.setText("Error: Invalid password. " + tries + " attempts remaining.");
+                    } else {
+                        lblMessage.setText("Error: Invalid username or password.");
+                    }
                     lblMessage.setForeground(Color.RED);
+                    break;
+                case ACCOUNT_LOCKED:
+                    lblMessage.setText("Account Locked! Too many failed attempts.");
+                    lblMessage.setForeground(Color.RED);
+
+                    Timer unlockTimer = new Timer(5000, evt -> {
+                        lblMessage.setText("Lock expired. You may try again.");
+                        lblMessage.setForeground(new Color(0, 128, 0)); // Green to signal "Go"
+                    });
+                    unlockTimer.setRepeats(false); // Run only once
+                    unlockTimer.start();
+                    // ------------------------------------------------
                     break;
                 default:
                     lblMessage.setText("Error: An unknown error occurred.");

@@ -19,7 +19,8 @@ public class AuthStore {
      * @return A UserAuth object if found, otherwise null.
      */
     public UserAuth findUserByUsername(String username) {
-        String query = "SELECT user_id, username, role, password_hash FROM users_auth WHERE username = ?";
+        // Updated query to fetch new columns
+        String query = "SELECT user_id, username, role, password_hash, failed_attempts, lockout_until FROM users_auth WHERE username = ?";
 
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
              PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -31,15 +32,48 @@ public class AuthStore {
                             rs.getInt("user_id"),
                             rs.getString("username"),
                             rs.getString("role"),
-                            rs.getString("password_hash")
+                            rs.getString("password_hash"),
+                            rs.getInt("failed_attempts"),    // <--- New
+                            rs.getTimestamp("lockout_until") // <--- New
                     );
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            // In a real app, you'd log this error
         }
-        return null; // User not found or DB error
+        return null;
+    }
+
+    // --- NEW HELPERS ---
+
+    public void incrementFailedAttempts(int userId) {
+        String query = "UPDATE users_auth SET failed_attempts = failed_attempts + 1 WHERE user_id = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, userId);
+            stmt.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    public void resetFailedAttempts(int userId) {
+        // Reset count AND clear lockout
+        String query = "UPDATE users_auth SET failed_attempts = 0, lockout_until = NULL WHERE user_id = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, userId);
+            stmt.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    public void lockAccount(int userId, int seconds) {
+        // Set lockout time to NOW + X seconds
+        String query = "UPDATE users_auth SET lockout_until = DATE_ADD(NOW(), INTERVAL ? SECOND) WHERE user_id = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, seconds);
+            stmt.setInt(2, userId);
+            stmt.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
     }
 
     // ... existing code ...
