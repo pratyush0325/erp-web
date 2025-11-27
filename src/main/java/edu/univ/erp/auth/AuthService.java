@@ -62,9 +62,18 @@ public class AuthService {
 
     // ... existing code ...
 
-    public boolean changePassword(int userId, String newPassword) {
-        // Hash the password using BCrypt
-        String hash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-        return authStore.updatePassword(userId, hash);
+    public boolean changePassword(int userId, String currentPassword, String newPassword) {
+        // 1. Fetch current user data
+        UserAuth user = authStore.findUserById(userId);
+        if (user == null) return false;
+
+        // 2. Verify the CURRENT password
+        if (!BCrypt.checkpw(currentPassword, user.getPasswordHash())) {
+            return false; // Wrong password provided
+        }
+
+        // 3. Hash the NEW password and update
+        String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+        return authStore.updatePassword(userId, newHash);
     }
 }

@@ -104,31 +104,37 @@ public class DashboardPanel extends JPanel {
 
     // --- NEW HELPER: Change Password Dialog ---
     private void showChangePasswordDialog() {
+        JPasswordField txtCurrent = new JPasswordField();
         JPasswordField txtPass = new JPasswordField();
         JPasswordField txtConfirm = new JPasswordField();
 
         Object[] msg = {
+                "Current Password:", txtCurrent,
                 "New Password:", txtPass,
                 "Confirm Password:", txtConfirm
         };
 
         int opt = JOptionPane.showConfirmDialog(this, msg, "Change Password", JOptionPane.OK_CANCEL_OPTION);
         if (opt == JOptionPane.OK_OPTION) {
+            String curr = new String(txtCurrent.getPassword());
             String p1 = new String(txtPass.getPassword());
             String p2 = new String(txtConfirm.getPassword());
 
+            if (curr.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter your current password.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             if (p1.isEmpty() || !p1.equals(p2)) {
-                JOptionPane.showMessageDialog(this, "Passwords do not match or are empty.", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "New passwords do not match or are empty.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
-            // Call API (AuthApi needs to be accessible, we initialized 'edu.univ.erp.api.auth.AuthApi' in 'PanelLogin' but here we need a new instance or pass it)
-            // Ideally we create a new instance since it's stateless except for the store
+            // Call API with Current + New password
             edu.univ.erp.api.auth.AuthApi authApi = new edu.univ.erp.api.auth.AuthApi();
-            if (authApi.changePassword(p1)) {
+            if (authApi.changePassword(curr, p1)) {
                 JOptionPane.showMessageDialog(this, "Password changed successfully!");
             } else {
-                JOptionPane.showMessageDialog(this, "Error changing password.");
+                JOptionPane.showMessageDialog(this, "Error changing password. (Is your current password correct?)", "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -386,7 +392,7 @@ public class DashboardPanel extends JPanel {
     private JComponent buildSections() {
         JPanel root = scaffold("Manage Sections");
 
-        String[] cols = {"ID", "Course", "Instructor", "Schedule", "Capacity"};
+        String[] cols = {"ID", "Course", "Instructor", "Schedule", "Capacity", "Sem", "Year"};
         sectionModel = new DefaultTableModel(cols, 0);
         JTable table = new JTable(sectionModel);
         decorateTable(table);
@@ -475,28 +481,31 @@ public class DashboardPanel extends JPanel {
         List<edu.univ.erp.domain.SectionAdminItem> list = adminApi.getSections();
         for (edu.univ.erp.domain.SectionAdminItem s : list) {
             sectionModel.addRow(new Object[]{
-                    s.getSectionId(), s.getCourseCode(), s.getInstructorName(), s.getSchedule(), s.getCapacity()
+                    s.getSectionId(),
+                    s.getCourseCode(),
+                    s.getInstructorName(),
+                    s.getSchedule(),
+                    s.getCapacity(),
+                    s.getSemester(), // <--- Show Sem
+                    s.getYear()      // <--- Show Year
             });
         }
     }
 
     private void showAddSectionDialog() {
+        // ... (Get Courses/Instructors lists as before) ...
         List<edu.univ.erp.domain.Course> courses = adminApi.getCourses();
         java.util.Map<Integer, String> instructors = adminApi.getInstructors();
-
-        if (courses.isEmpty() || instructors.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please ensure you have Courses and Instructors created first.");
-            return;
-        }
+        // ... (Check if empty) ...
 
         JComboBox<edu.univ.erp.domain.Course> comboCourse = new JComboBox<>(courses.toArray(new edu.univ.erp.domain.Course[0]));
 
+        // Instructor Dropdown helper
         class InstructorOption {
             final int id; final String name;
             InstructorOption(int id, String name) { this.id = id; this.name = name; }
             public String toString() { return name; }
         }
-
         JComboBox<InstructorOption> comboInst = new JComboBox<>();
         instructors.forEach((id, name) -> comboInst.addItem(new InstructorOption(id, name)));
 
@@ -504,9 +513,16 @@ public class DashboardPanel extends JPanel {
         JTextField txtRoom = new JTextField("101");
         JTextField txtCap = new JTextField("60");
 
+        // NEW FIELDS
+        String[] semesters = {"Monsoon", "Winter", "Summer"};
+        JComboBox<String> comboSem = new JComboBox<>(semesters);
+        JTextField txtYear = new JTextField(String.valueOf(java.time.Year.now().getValue()));
+
         Object[] msg = {
                 "Course:", comboCourse,
                 "Instructor:", comboInst,
+                "Semester:", comboSem,  // <--- Add to dialog
+                "Year:", txtYear,       // <--- Add to dialog
                 "Day/Time:", txtTime,
                 "Room:", txtRoom,
                 "Capacity:", txtCap
@@ -518,14 +534,16 @@ public class DashboardPanel extends JPanel {
                 edu.univ.erp.domain.Course c = (edu.univ.erp.domain.Course) comboCourse.getSelectedItem();
                 InstructorOption i = (InstructorOption) comboInst.getSelectedItem();
                 int cap = Integer.parseInt(txtCap.getText());
+                int year = Integer.parseInt(txtYear.getText()); // <--- Parse Year
+                String sem = (String) comboSem.getSelectedItem();
 
-                // --- VALIDATION ---
                 if (cap <= 0) {
-                    JOptionPane.showMessageDialog(this, "Capacity must be greater than 0.", "Validation Error", JOptionPane.ERROR_MESSAGE);
-                    return;
+                    JOptionPane.showMessageDialog(this, "Capacity must be > 0"); return;
                 }
 
-                boolean ok = adminApi.addSection(c.getCode(), i.id, txtTime.getText(), txtRoom.getText(), cap);
+                // Call Updated API
+                boolean ok = adminApi.addSection(c.getCode(), i.id, txtTime.getText(), txtRoom.getText(), cap, sem, year);
+
                 if (ok) {
                     JOptionPane.showMessageDialog(this, "Section Scheduled!");
                     refreshSectionTable();
@@ -533,7 +551,7 @@ public class DashboardPanel extends JPanel {
                     JOptionPane.showMessageDialog(this, "Error scheduling section.");
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Invalid input.");
+                JOptionPane.showMessageDialog(this, "Invalid input (Year/Capacity must be numbers).");
             }
         }
     }

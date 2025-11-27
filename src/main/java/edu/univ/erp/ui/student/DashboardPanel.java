@@ -24,6 +24,7 @@ import javax.swing.JButton;
 import javax.swing.JOptionPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.table.DefaultTableModel;
+import edu.univ.erp.util.GradeUtils;
 
 public class DashboardPanel extends JPanel {
 
@@ -104,28 +105,45 @@ public class DashboardPanel extends JPanel {
 
 
     private JComponent buildDashboardHome() {
-        JPanel root = pageScaffold("Dashboard");
-        JPanel grid = new JPanel(new GridLayout(2, 3, 16, 16));
-        grid.setOpaque(false);
+        JPanel root = pageScaffold("Student Dashboard");
 
-        // Placeholder icons
-        Icon courseIcon = UIManager.getIcon("OptionPane.informationIcon");
-        Icon regIcon    = UIManager.getIcon("OptionPane.questionIcon");
-        Icon timeIcon   = UIManager.getIcon("OptionPane.warningIcon");
-        Icon gradeIcon  = UIManager.getIcon("OptionPane.informationIcon");
-        Icon gpaIcon    = UIManager.getIcon("OptionPane.informationIcon");
-        Icon holdIcon   = UIManager.getIcon("OptionPane.errorIcon");
+        // 1. Fetch Real Data
+        int enrolledCount = studentApi.getMyRegistrations().size();
+        String deadline = studentApi.getDeadline();
+        edu.univ.erp.domain.StudentProfile profile = studentApi.getProfile();
+        String program = (profile != null) ? profile.getProgram() : "General";
 
-        grid.add(new StatCard("Courses this term", "4", "Including labs", courseIcon));
-        grid.add(new StatCard("My Registrations", "4/6", "Capacity remaining", regIcon));
-        grid.add(new StatCard("Classes today", "2", "Next: 11:00 AM", timeIcon));
-        grid.add(new StatCard("Graded items", "7", "New: 1 midterm posted", gradeIcon));
-        grid.add(new StatCard("Current GPA", "8.21", "UG program", gpaIcon));
-        grid.add(new StatCard("Holds/Warnings", "0", "All clear", holdIcon));
+        // 2. Setup Panel for Cards
+        JPanel cardsPanel = new JPanel(new GridLayout(1, 3, 20, 0));
+        cardsPanel.setOpaque(false);
 
-        root.add(grid, BorderLayout.CENTER);
+        // 3. Create Cards (Icons removed)
 
-        // --- NEW: Change Password Button ---
+        // Card 1: Enrolled (Light Blue)
+        StatCard card1 = new StatCard("Enrolled", String.valueOf(enrolledCount), "Active Sections", null);
+        card1.setBackground(new Color(0xE1F5FE));
+        cardsPanel.add(card1);
+
+        // Card 2: Deadline (Light Orange/Red)
+        StatCard card2 = new StatCard("Deadline", deadline, "Add/Drop Cut-off", null);
+        card2.setBackground(new Color(0xFFEBEE));
+        cardsPanel.add(card2);
+
+        // Card 3: Program (Light Green)
+        StatCard card3 = new StatCard("Program", program, "Academic Major", null);
+        card3.setBackground(new Color(0xE8F5E9));
+        cardsPanel.add(card3);
+
+        // 4. Layout Container
+        JPanel container = new JPanel(new BorderLayout());
+        container.setOpaque(false);
+        container.add(cardsPanel, BorderLayout.NORTH);
+
+        // (Welcome Message Removed)
+
+        root.add(container, BorderLayout.CENTER);
+
+        // 5. Change Password Button
         JButton btnPass = new JButton("Change Password");
         btnPass.addActionListener(e -> showChangePasswordDialog());
 
@@ -133,36 +151,42 @@ public class DashboardPanel extends JPanel {
         btnPanel.setOpaque(false);
         btnPanel.add(btnPass);
         root.add(btnPanel, BorderLayout.SOUTH);
-        // -----------------------------------
 
         return root;
     }
 
     private void showChangePasswordDialog() {
+        JPasswordField txtCurrent = new JPasswordField();
         JPasswordField txtPass = new JPasswordField();
         JPasswordField txtConfirm = new JPasswordField();
 
         Object[] msg = {
+                "Current Password:", txtCurrent,
                 "New Password:", txtPass,
                 "Confirm Password:", txtConfirm
         };
 
         int opt = JOptionPane.showConfirmDialog(this, msg, "Change Password", JOptionPane.OK_CANCEL_OPTION);
         if (opt == JOptionPane.OK_OPTION) {
+            String curr = new String(txtCurrent.getPassword());
             String p1 = new String(txtPass.getPassword());
             String p2 = new String(txtConfirm.getPassword());
 
+            if (curr.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter your current password.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             if (p1.isEmpty() || !p1.equals(p2)) {
-                JOptionPane.showMessageDialog(this, "Passwords do not match or are empty.", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "New passwords do not match or are empty.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
-            // Use a new instance of AuthApi to handle the request
+            // Call API with Current + New password
             edu.univ.erp.api.auth.AuthApi authApi = new edu.univ.erp.api.auth.AuthApi();
-            if (authApi.changePassword(p1)) {
+            if (authApi.changePassword(curr, p1)) {
                 JOptionPane.showMessageDialog(this, "Password changed successfully!");
             } else {
-                JOptionPane.showMessageDialog(this, "Error changing password.", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Error changing password. (Is your current password correct?)", "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -171,14 +195,14 @@ public class DashboardPanel extends JPanel {
         JPanel root = pageScaffold("Course Catalog");
 
         // 1. Define columns (we will NOT add section_id here)
-        String[] columnNames = {"Code", "Title", "Credits", "Instructor", "Capacity"};
+        String[] columnNames = {"Code", "Title", "Credits", "Instructor", "Capacity", "Sem", "Year"};
 
         // 2. Fetch data from the API
         CatalogApi catalogApi = new CatalogApi();
         catalogItems = catalogApi.getCatalog(); // Store data in the class field
 
         // 3. Convert List to Object[][] for the JTable
-        Object[][] data = new Object[catalogItems.size()][5];
+        Object[][] data = new Object[catalogItems.size()][7];
         for (int i = 0; i < catalogItems.size(); i++) {
             CatalogItem item = catalogItems.get(i);
             data[i][0] = item.getCode();
@@ -186,6 +210,8 @@ public class DashboardPanel extends JPanel {
             data[i][2] = item.getCredits();
             data[i][3] = item.getInstructorName();
             data[i][4] = item.getCapacity();
+            data[i][5] = item.getSemester(); // <--- Show Sem
+            data[i][6] = item.getYear();     // <--- Show Year
         }
 
         // 4. Create the table
@@ -220,8 +246,8 @@ public class DashboardPanel extends JPanel {
             RegistrationStatus status = studentApi.registerForSection(selectedSectionId);
 
             // Show a friendly message
-            String message;
-            int messageType;
+            String message = "";
+            int messageType = JOptionPane.INFORMATION_MESSAGE;
 
             switch (status) {
                 case MAINTENANCE_MODE:
@@ -369,19 +395,49 @@ public class DashboardPanel extends JPanel {
     private JComponent buildGradesPage() {
         JPanel root = pageScaffold("Grades");
 
-        // 1. Fetch Real Data
         java.util.List<edu.univ.erp.domain.StudentGradeView> grades = studentApi.getMyGrades();
 
-        // 2. Prepare Table Data
-        String[] columns = {"Course", "Component", "Score", "Max"};
+        // --- STEP 1: Calculate Course Totals ---
+        // We need to know the total weight and score for each course ID
+        java.util.Map<String, Integer> courseWeights = new java.util.HashMap<>();
+        java.util.Map<String, Double> courseScores = new java.util.HashMap<>();
+
+        for (edu.univ.erp.domain.StudentGradeView g : grades) {
+            String code = g.getCourseCode();
+
+            // Accumulate weight (e.g. 20 + 30 = 50)
+            courseWeights.put(code, courseWeights.getOrDefault(code, 0) + g.getWeight());
+
+            // Accumulate weighted score (e.g. (18/20)*20 = 18 pts)
+            double contribution = (g.getScore() / g.getMaxScore()) * g.getWeight();
+            courseScores.put(code, courseScores.getOrDefault(code, 0.0) + contribution);
+        }
+
+        // --- STEP 2: Build Table ---
+        // Columns: Removed "Max", Added "Course Grade"
+        String[] columns = {"Course", "Component", "Score", "Course Grade"};
         javax.swing.table.DefaultTableModel model = new javax.swing.table.DefaultTableModel(columns, 0);
 
         for (edu.univ.erp.domain.StudentGradeView g : grades) {
+            String code = g.getCourseCode();
+
+            // Determine the status for the WHOLE course
+            String courseStatus;
+            int totalW = courseWeights.getOrDefault(code, 0);
+
+            if (totalW < 100) {
+                courseStatus = "In Progress";
+            } else {
+                // If weight is 100+, calculate the final letter
+                double finalPct = courseScores.getOrDefault(code, 0.0);
+                courseStatus = edu.univ.erp.util.GradeUtils.getLetterGrade(finalPct);
+            }
+
             model.addRow(new Object[]{
-                    g.getCourseCode(),
+                    code,
                     g.getComponent(),
-                    g.getScore(),
-                    g.getMaxScore()
+                    g.getScore(), // Raw score only (Max column removed)
+                    courseStatus  // Shows "A" or "In Progress" for every row of this course
             });
         }
 
@@ -389,7 +445,6 @@ public class DashboardPanel extends JPanel {
         decorateTable(table);
         root.add(new JScrollPane(table), BorderLayout.CENTER);
 
-        // Add refresh button
         JButton btnRefresh = new JButton("Refresh");
         btnRefresh.addActionListener(e -> showPage(PAGE_GRADES));
         root.add(btnRefresh, BorderLayout.SOUTH);
@@ -403,23 +458,27 @@ public class DashboardPanel extends JPanel {
         JTextArea transcriptArea = new JTextArea();
         transcriptArea.setEditable(false);
         transcriptArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
-        transcriptArea.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        // 1. Fetch & Calculate Grades
         java.util.List<edu.univ.erp.domain.StudentGradeView> grades = studentApi.getMyGrades();
 
-        // Helper map to aggregate scores: CourseCode -> FinalPercentage
+        // Maps to hold aggregated data
         java.util.Map<String, Double> courseTotals = new java.util.HashMap<>();
         java.util.Map<String, String> courseTitles = new java.util.HashMap<>();
+        java.util.Map<String, Integer> courseWeights = new java.util.HashMap<>(); // <--- New Map
 
+        // 1. Calculate Totals and Weights
         for (edu.univ.erp.domain.StudentGradeView g : grades) {
-            // Formula: (Score / Max) * Weight
             double weightedScore = (g.getScore() / g.getMaxScore()) * g.getWeight();
 
             courseTotals.put(g.getCourseCode(),
                     courseTotals.getOrDefault(g.getCourseCode(), 0.0) + weightedScore
             );
             courseTitles.put(g.getCourseCode(), g.getCourseTitle());
+
+            // Accumulate weight for this course
+            courseWeights.put(g.getCourseCode(),
+                    courseWeights.getOrDefault(g.getCourseCode(), 0) + g.getWeight()
+            );
         }
 
         // 2. Build Display Text
@@ -429,7 +488,17 @@ public class DashboardPanel extends JPanel {
 
         for (String code : courseTotals.keySet()) {
             double finalPct = courseTotals.get(code);
-            String letterGrade = getLetterGrade(finalPct);
+            int totalWeight = courseWeights.getOrDefault(code, 0);
+
+            String letterGrade;
+            // --- NEW LOGIC ---
+            if (totalWeight < 100) {
+                letterGrade = "In Progress";
+            } else {
+                letterGrade = edu.univ.erp.util.GradeUtils.getLetterGrade(finalPct);
+            }
+            // -----------------
+
             sb.append(String.format("%-10s %-40s %.2f%% (%s)\n",
                     code, courseTitles.get(code), finalPct, letterGrade));
         }
@@ -448,8 +517,17 @@ public class DashboardPanel extends JPanel {
                     pw.println("Code,Title,Percentage,Grade");
                     for (String code : courseTotals.keySet()) {
                         double finalPct = courseTotals.get(code);
+                        int totalWeight = courseWeights.getOrDefault(code, 0);
+
+                        String letter;
+                        if (totalWeight < 100) {
+                            letter = "In Progress";
+                        } else {
+                            letter = edu.univ.erp.util.GradeUtils.getLetterGrade(finalPct);
+                        }
+
                         pw.printf("%s,%s,%.2f,%s%n",
-                                code, courseTitles.get(code), finalPct, getLetterGrade(finalPct));
+                                code, courseTitles.get(code), finalPct, letter);
                     }
                     JOptionPane.showMessageDialog(this, "Export Successful!");
                 } catch (Exception ex) {
@@ -470,13 +548,7 @@ public class DashboardPanel extends JPanel {
     }
 
     // Helper for Letter Grades
-    private String getLetterGrade(double percentage) {
-        if (percentage >= 90) return "A";
-        if (percentage >= 80) return "B";
-        if (percentage >= 70) return "C";
-        if (percentage >= 60) return "D";
-        return "F";
-    }
+
 
     private JComponent buildProfilePage() {
         JPanel root = pageScaffold("Profile");
@@ -503,15 +575,13 @@ public class DashboardPanel extends JPanel {
         addProfileRow(form, gc, 2, "Program:", profile.getProgram());
         addProfileRow(form, gc, 3, "Year:", String.valueOf(profile.getYear()));
 
-        // Add a "logout" hint or button
+        // --- NEW: Layout Fix ---
+        // Add an invisible spacer at the bottom that consumes all extra vertical space.
+        // This forces the rows above (0-3) to stick to the top of the screen.
         gc.gridy = 4;
-        gc.gridx = 1;
-        gc.weighty = 1.0; // push to top
-        gc.anchor = GridBagConstraints.NORTHWEST;
-        JLabel hint = new JLabel("To change details, contact Administrator.");
-        hint.setFont(new Font("SansSerif", Font.ITALIC, 12));
-        hint.setForeground(ColorPalette.TEXT_MUTED);
-        form.add(hint, gc);
+        gc.weighty = 1.0;
+        form.add(Box.createVerticalGlue(), gc);
+        // -----------------------
 
         root.add(form, BorderLayout.CENTER);
         return root;

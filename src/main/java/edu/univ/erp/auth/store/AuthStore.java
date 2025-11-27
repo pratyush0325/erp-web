@@ -76,6 +76,30 @@ public class AuthStore {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
+    public UserAuth findUserById(int userId) {
+        String query = "SELECT user_id, username, role, password_hash, failed_attempts, lockout_until FROM users_auth WHERE user_id = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setInt(1, userId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return new UserAuth(
+                            rs.getInt("user_id"),
+                            rs.getString("username"),
+                            rs.getString("role"),
+                            rs.getString("password_hash"),
+                            rs.getInt("failed_attempts"),
+                            rs.getTimestamp("lockout_until")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     // ... existing code ...
 
     public boolean updatePassword(int userId, String newHash) {

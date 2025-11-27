@@ -138,14 +138,17 @@ public class AdminStore {
 
     // --- SECTION MANAGEMENT ---
 
+    // ... inside AdminStore class ...
+
     public java.util.List<edu.univ.erp.domain.SectionAdminItem> getAllSections() {
         java.util.List<edu.univ.erp.domain.SectionAdminItem> list = new java.util.ArrayList<>();
-        // Join with users_auth to get the instructor's actual username/name
-        String query = "SELECT s.section_id, s.course_id, u.username, s.day_time, s.capacity " +
+
+        // UPDATED QUERY: Added s.semester, s.year
+        String query = "SELECT s.section_id, s.course_id, u.username, s.day_time, s.capacity, s.semester, s.year " +
                 "FROM sections s " +
                 "JOIN instructors i ON s.instructor_id = i.user_id " +
                 "JOIN auth_db.users_auth u ON i.user_id = u.user_id " +
-                "ORDER BY s.course_id, s.section_id";
+                "ORDER BY s.year DESC, s.semester, s.course_id"; // Better sorting
 
         try (Connection conn = DriverManager.getConnection(dbUrlErp, dbUser, dbPassword);
              PreparedStatement stmt = conn.prepareStatement(query);
@@ -156,16 +159,19 @@ public class AdminStore {
                         rs.getString("course_id"),
                         rs.getString("username"),
                         rs.getString("day_time"),
-                        rs.getInt("capacity")
+                        rs.getInt("capacity"),
+                        rs.getString("semester"), // <--- Pass to constructor
+                        rs.getInt("year")         // <--- Pass to constructor
                 ));
             }
         } catch (SQLException e) { e.printStackTrace(); }
         return list;
     }
 
-    public boolean addSection(String courseId, int instructorId, String dayTime, String room, int capacity) {
+    // UPDATED: Accepts semester and year
+    public boolean addSection(String courseId, int instructorId, String dayTime, String room, int capacity, String semester, int year) {
         String query = "INSERT INTO sections (course_id, instructor_id, day_time, room, capacity, semester, year) " +
-                "VALUES (?, ?, ?, ?, ?, 'Fall', 2025)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = DriverManager.getConnection(dbUrlErp, dbUser, dbPassword);
              PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setString(1, courseId);
@@ -173,12 +179,15 @@ public class AdminStore {
             stmt.setString(3, dayTime);
             stmt.setString(4, room);
             stmt.setInt(5, capacity);
+            stmt.setString(6, semester); // <--- Set Semester
+            stmt.setInt(7, year);        // <--- Set Year
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
         }
     }
+
 
     // Helper to populate Instructor dropdown
     public java.util.Map<Integer, String> getInstructorsMap() {

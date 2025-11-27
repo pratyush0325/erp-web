@@ -11,6 +11,7 @@ import java.util.List;
 
 public class InstructorApi {
     private final InstructorStore instructorStore = new InstructorStore();
+    private final edu.univ.erp.data.SettingsStore settingsStore = new edu.univ.erp.data.SettingsStore();
 
     public List<InstructorCourseItem> getMyCourses() {
         int instructorId = UserSession.getInstance().getUserId();
@@ -46,5 +47,27 @@ public class InstructorApi {
     public boolean saveWeights(int sectionId, int q, int m, int e) {
         if (MaintenanceApi.isMaintenanceOn()) return false;
         return instructorStore.configureWeights(sectionId, q, m, e);
+    }
+
+    public java.util.List<edu.univ.erp.domain.CourseStats> getAllCourseStatistics() {
+        // 1. Get all my sections
+        List<InstructorCourseItem> courses = getMyCourses();
+        java.util.List<edu.univ.erp.domain.CourseStats> statsList = new java.util.ArrayList<>();
+
+        // 2. Calculate stats for each
+        for (InstructorCourseItem c : courses) {
+            statsList.add(instructorStore.getSectionStatistics(c.getSectionId(), c.getCourseCode(), c.getCourseTitle()));
+        }
+        return statsList;
+    }
+
+    public String getDeadline() {
+        java.time.LocalDate date = settingsStore.getRegistrationDeadline();
+        return (date != null) ? date.toString() : "None";
+    }
+
+    public int getPendingGrades() {
+        int instructorId = UserSession.getInstance().getUserId();
+        return instructorStore.getPendingGradesCount(instructorId);
     }
 }

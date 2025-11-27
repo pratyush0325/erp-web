@@ -40,19 +40,19 @@ public class Sidebar extends JPanel {
         appName.setAlignmentX(Component.LEFT_ALIGNMENT);
         add(appName);
 
-        addSection("Navigation");
+//        addSection("Navigation");
 
-        addItem("dashboard", "🏠", "Dashboard", true);
-        addItem("catalog", "📚", "Course Catalog", false);
-        addItem("registrations", "📝", "My Registrations", false);
-        addItem("timetable", "📅", "Timetable", false);
-        addItem("grades", "🧮", "Grades", false);
-        addItem("transcript", "📄", "Transcript", false);
-        addItem("profile", "👤", "Profile", false);
+        addItem("dashboard", "Dashboard", true);
+        addItem("catalog","Course Catalog", false);
+        addItem("registrations", "My Registrations", false);
+        addItem("timetable", "Timetable", false);
+        addItem("grades","Grades", false);
+        addItem("transcript", "Transcript", false);
+        addItem("profile","Profile", false);
 
         add(Box.createVerticalGlue());
-        addSection("Account");
-        addItem("logout", "🚪", "Logout", false);
+//        addSection("Account");
+        addItem("logout", "Logout", false);
     }
 
     // Adds section headers like "Navigation", "Account"
@@ -68,19 +68,44 @@ public class Sidebar extends JPanel {
 
     // Adds a single clickable item
         // Adds a single clickable item
-    private void addItem(String key, String icon, String text, boolean selected) {
-        JPanel itemPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
-        MenuItem builder = new MenuItem(itemPanel);
-        builder.addMenuItem(text, icon, selected);
+    private void addItem(String key, String text, boolean selected) {
+        // --- FIX: Robust Custom JPanel ---
+        JPanel itemPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                // 1. Clear the area first (Important!)
+                // This prevents "ghosting" of old text
+                super.paintComponent(g);
 
-        menuItems.put(key, builder); // Store the MenuItem, not the panel
-        add(itemPanel);
+                // 2. Paint our custom background (white overlay)
+                // Use the correct color based on opacity/selection
+                Color bg = getBackground();
+                g.setColor(bg);
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        };
+        // ---------------------------------
+
+        // We still need this to be false so the parent's gradient shows up
+        itemPanel.setOpaque(false);
+
+        MenuItem builder = new MenuItem(itemPanel);
+        builder.addMenuItem(text, selected);
+
+        menuItems.put(key, builder); // Note: For Admin/Instructor, this map name might be 'itemPanels'
+        // If your variable is 'itemPanels', change 'menuItems' to 'itemPanels' here.
+
         itemPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        add(itemPanel);
 
         itemPanel.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 if (controller != null) controller.showPage(key);
                 setSelected(key);
+
+                // Force a repaint of the whole sidebar to clear artifacts
+                revalidate();
+                repaint();
             }
         });
 

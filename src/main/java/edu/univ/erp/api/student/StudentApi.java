@@ -13,6 +13,8 @@ public class StudentApi {
 
     private final RegistrationStore registrationStore = new RegistrationStore();
     private final edu.univ.erp.data.ProfileStore profileStore = new edu.univ.erp.data.ProfileStore();
+    private final edu.univ.erp.data.SettingsStore settingsStore = new edu.univ.erp.data.SettingsStore();
+
     /**
      * Gets the list of registered courses for the *currently logged-in* student.
      *
@@ -61,5 +63,10 @@ public class StudentApi {
     public edu.univ.erp.domain.StudentProfile getProfile() {
         int studentId = UserSession.getInstance().getUserId();
         return profileStore.getStudentProfile(studentId);
+    }
+
+    public String getDeadline() {
+        java.time.LocalDate date = settingsStore.getRegistrationDeadline();
+        return (date != null) ? date.toString() : "None";
     }
 }

@@ -258,5 +258,80 @@ public class InstructorStore {
         }
         return true;
     }
+
+    /**
+     * Calculates complex statistics for a section by aggregating student scores.
+     */
+    public edu.univ.erp.domain.CourseStats getSectionStatistics(int sectionId, String code, String title) {
+        // 1. Get all assignments for this section
+        java.util.List<AssignmentScore> assignments = getAssignmentsForSection(sectionId);
+
+        // 2. Get all students enrolled
+        java.util.List<StudentGradeItem> students = getStudentsBySectionId(sectionId);
+
+        if (students.isEmpty()) {
+            return new edu.univ.erp.domain.CourseStats(code, title, 0, 0, 0, 0, 0);
+        }
+
+        int submittedCount = 0;
+        double min = 100.0;
+        double max = 0.0;
+        double sum = 0.0;
+        int countWithScores = 0;
+
+        // 3. Calculate Final Grade for each student
+        for (StudentGradeItem student : students) {
+            double totalWeighted = 0.0;
+            boolean hasAnyScore = false;
+
+            for (AssignmentScore assign : assignments) {
+                // We reuse getStudentScore (fetching one by one is slow for production but fine here)
+                Double score = getStudentScore(student.getStudentId(), assign.getAssignmentId());
+                if (score != null) {
+                    hasAnyScore = true;
+                    totalWeighted += (score / assign.getMaxScore()) * assign.getWeight();
+                }
+            }
+
+            // Only include in stats if they have actually been graded
+            if (hasAnyScore) {
+                submittedCount++;
+                if (totalWeighted < min) min = totalWeighted;
+                if (totalWeighted > max) max = totalWeighted;
+                sum += totalWeighted;
+                countWithScores++;
+            }
+        }
+
+        double avg = (countWithScores > 0) ? (sum / countWithScores) : 0.0;
+        // If no one has scores, reset min to 0
+        if (countWithScores == 0) min = 0.0;
+
+        return new edu.univ.erp.domain.CourseStats(
+                code, title, students.size(), submittedCount, min, max, avg
+        );
+    }
+
+    public int getPendingGradesCount(int instructorId) {
+        // Count students in this instructor's sections who don't have a final grade yet
+        String query = "SELECT COUNT(*) FROM enrollments e " +
+                "JOIN sections s ON e.section_id = s.section_id " +
+                "WHERE s.instructor_id = ? AND (e.grade IS NULL OR e.grade = '')";
+
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setInt(1, instructorId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
 } // <--- End of class
 

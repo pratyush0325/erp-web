@@ -40,8 +40,8 @@ public class AuthApi {
 
     // ... existing code ...
 
-    public boolean changePassword(String newPassword) {
+    public boolean changePassword(String currentPassword, String newPassword) {
         int userId = UserSession.getInstance().getUserId();
-        return authService.changePassword(userId, newPassword);
+        return authService.changePassword(userId, currentPassword, newPassword);
     }
 }

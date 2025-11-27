@@ -16,6 +16,7 @@ import java.util.List;
 
 import edu.univ.erp.api.maintenance.MaintenanceApi;
 import edu.univ.erp.ui.common.ColorPalette;
+import edu.univ.erp.util.GradeUtils;
 
 public class DashboardPanel extends JPanel {
 
@@ -88,76 +89,87 @@ public class DashboardPanel extends JPanel {
         contentPanel.removeAll();
         JPanel root = scaffold("Instructor Overview");
 
-        // Panel for Cards
         JPanel cardsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 20));
         cardsPanel.setOpaque(false);
 
-        // Fetch Data
+        // 1. Fetch Data
         List<InstructorCourseItem> courses = api.getMyCourses();
         int totalCourses = courses.size();
         int totalStudents = 0;
         for (InstructorCourseItem c : courses) {
             totalStudents += c.getEnrolledCount();
         }
+        int pendingGrades = api.getPendingGrades();
 
-        // Add Cards
+        // NEW: Fetch Deadline
+        String deadline = api.getDeadline();
+
+        // 2. Add Cards
         cardsPanel.add(createStatCard("Active Courses", String.valueOf(totalCourses), new Color(0xE1F5FE)));
         cardsPanel.add(createStatCard("Total Students", String.valueOf(totalStudents), new Color(0xE8F5E9)));
-        cardsPanel.add(createStatCard("Pending Grades", "5", new Color(0xFFF3E0)));
+        cardsPanel.add(createStatCard("Pending Grades", String.valueOf(pendingGrades), new Color(0xFFF3E0)));
 
-        // Welcome Text
-        JTextArea info = new JTextArea("Welcome, Instructor.\n\n" +
-                "• Use 'My Sections' to view student details.\n" +
-                "• Use 'Gradebook' to enter marks for Quizzes and Exams.\n" +
-                "• Check 'Statistics' for enrollment analysis.");
-        info.setEditable(false);
-        info.setOpaque(false);
-        info.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        info.setBorder(new EmptyBorder(20, 20, 0, 0));
+        // NEW CARD
+        cardsPanel.add(createStatCard("Add/Drop Deadline", deadline, new Color(0xF3E5F5)));
+
+//        JTextArea info = new JTextArea("Welcome, Instructor.\n\n" +
+//                "• Use 'My Sections' to view student details.\n" +
+//                "• Use 'Gradebook' to enter marks for Quizzes and Exams.\n" +
+//                "• Check 'Statistics' for enrollment analysis.");
+//        info.setEditable(false);
+//        info.setOpaque(false);
+//        info.setFont(new Font("SansSerif", Font.PLAIN, 14));
+//        info.setBorder(new EmptyBorder(20, 20, 0, 0));
 
         JPanel container = new JPanel(new BorderLayout());
         container.add(cardsPanel, BorderLayout.CENTER);
-        container.add(info, BorderLayout.SOUTH);
+//        container.add(info, BorderLayout.SOUTH);
 
         root.add(container, BorderLayout.NORTH);
 
-        // --- NEW: Change Password Button ---
+        // Change Password Button
         JButton btnPass = new JButton("Change Password");
         btnPass.addActionListener(e -> showChangePasswordDialog());
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         btnPanel.add(btnPass);
         root.add(btnPanel, BorderLayout.SOUTH);
-        // -----------------------------------
 
         refreshView(root);
     }
 
     private void showChangePasswordDialog() {
+        JPasswordField txtCurrent = new JPasswordField();
         JPasswordField txtPass = new JPasswordField();
         JPasswordField txtConfirm = new JPasswordField();
 
         Object[] msg = {
+                "Current Password:", txtCurrent,
                 "New Password:", txtPass,
                 "Confirm Password:", txtConfirm
         };
 
         int opt = JOptionPane.showConfirmDialog(this, msg, "Change Password", JOptionPane.OK_CANCEL_OPTION);
         if (opt == JOptionPane.OK_OPTION) {
+            String curr = new String(txtCurrent.getPassword());
             String p1 = new String(txtPass.getPassword());
             String p2 = new String(txtConfirm.getPassword());
 
+            if (curr.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter your current password.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             if (p1.isEmpty() || !p1.equals(p2)) {
-                JOptionPane.showMessageDialog(this, "Passwords do not match or are empty.", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "New passwords do not match or are empty.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
-            // Use a new instance of AuthApi
+            // Call API with Current + New password
             edu.univ.erp.api.auth.AuthApi authApi = new edu.univ.erp.api.auth.AuthApi();
-            if (authApi.changePassword(p1)) {
+            if (authApi.changePassword(curr, p1)) {
                 JOptionPane.showMessageDialog(this, "Password changed successfully!");
             } else {
-                JOptionPane.showMessageDialog(this, "Error changing password.", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Error changing password. (Is your current password correct?)", "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -273,27 +285,25 @@ public class DashboardPanel extends JPanel {
         contentPanel.removeAll();
         JPanel root = scaffold("Grading: " + courseName);
 
-        // 1. Fetch Assignments (Should be Quiz, Midterm, End-Sem if configured)
+        // 1. Fetch Assignments
         List<AssignmentScore> assignments = api.getCourseAssignments(sectionId);
 
-        // Setup Columns
         Vector<String> columnNames = new Vector<>();
         columnNames.add("Student ID");
         columnNames.add("Name");
 
-        // Helper vars to pre-fill the dialog later
         int wQ = 0, wM = 0, wE = 0;
 
         for (AssignmentScore assign : assignments) {
             columnNames.add(String.format("%s (%d%%)", assign.getAssignmentName(), assign.getWeight()));
-            // Capture current weights for the dialog
             if ("Quiz".equals(assign.getAssignmentName())) wQ = assign.getWeight();
             if ("Midterm".equals(assign.getAssignmentName())) wM = assign.getWeight();
             if ("End-Sem".equals(assign.getAssignmentName())) wE = assign.getWeight();
         }
         columnNames.add("Total (%)");
+        columnNames.add("Grade");
 
-        // 2. Build Data Rows
+        // 2. Build Rows
         List<StudentGradeItem> students = api.getClassList(sectionId);
         DefaultTableModel model = new DefaultTableModel(columnNames, 0);
 
@@ -303,15 +313,29 @@ public class DashboardPanel extends JPanel {
             row.add(student.getName());
 
             double totalWeightedScore = 0.0;
+            int totalGradedWeight = 0; // <--- Track how much weight has been graded
+
             for (AssignmentScore assign : assignments) {
                 Double score = api.getScore(student.getStudentId(), assign.getAssignmentId());
                 row.add(score == null ? "-" : String.valueOf(score));
+
                 if (score != null) {
                     double percentage = score / assign.getMaxScore();
                     totalWeightedScore += percentage * assign.getWeight();
+                    totalGradedWeight += assign.getWeight(); // <--- Add weight if graded
                 }
             }
+
             row.add(String.format("%.2f%%", totalWeightedScore));
+
+            // --- NEW LOGIC: Check if course is complete ---
+            if (totalGradedWeight < 100) {
+                row.add("In Progress");
+            } else {
+                row.add(edu.univ.erp.util.GradeUtils.getLetterGrade(totalWeightedScore));
+            }
+            // ----------------------------------------------
+
             model.addRow(row);
         }
 
@@ -322,11 +346,10 @@ public class DashboardPanel extends JPanel {
         // --- BUTTONS ---
         JButton btnBack = new JButton("Back");
 
-        // NEW: Configure Weights Button
         JButton btnWeights = new JButton("Configure Grading");
         if (assignments.isEmpty()) {
             btnWeights.setText("Setup Grading (Required)");
-            btnWeights.setForeground(new Color(220, 53, 69)); // Red to alert user
+            btnWeights.setForeground(new Color(220, 53, 69));
         }
 
         JButton btnEnterMark = new JButton("Enter Mark");
@@ -336,8 +359,8 @@ public class DashboardPanel extends JPanel {
                 btnEnterMark.setEnabled(table.getSelectedRow() != -1)
         );
 
-        // Logic: Configure Weights
-        int finalWQ = wQ; int finalWM = wM; int finalWE = wE; // eff-final for lambda
+        // Configure Weights Logic
+        int finalWQ = wQ; int finalWM = wM; int finalWE = wE;
         btnWeights.addActionListener(e -> {
             if (MaintenanceApi.isMaintenanceOn()) {
                 JOptionPane.showMessageDialog(root, "Maintenance Mode ON. Changes disabled.", "Blocked", JOptionPane.WARNING_MESSAGE);
@@ -368,7 +391,7 @@ public class DashboardPanel extends JPanel {
 
                     if (api.saveWeights(sectionId, q, m, end)) {
                         JOptionPane.showMessageDialog(root, "Grading scheme updated!");
-                        showComponentGradebook(sectionId, courseName); // Refresh
+                        showComponentGradebook(sectionId, courseName);
                     } else {
                         JOptionPane.showMessageDialog(root, "Failed to save.");
                     }
@@ -378,7 +401,8 @@ public class DashboardPanel extends JPanel {
             }
         });
 
-        // Logic: Enter Mark (Same as before)
+        // Enter Mark Logic
+        // Logic: Enter Mark
         btnEnterMark.addActionListener(e -> {
             if (MaintenanceApi.isMaintenanceOn()) {
                 JOptionPane.showMessageDialog(root, "Maintenance Mode ON.", "Blocked", JOptionPane.WARNING_MESSAGE);
@@ -387,7 +411,8 @@ public class DashboardPanel extends JPanel {
             int row = table.getSelectedRow();
             int col = table.getSelectedColumn();
 
-            if (row != -1 && col >= 2 && col < columnNames.size() - 1) {
+            // Ensure the user clicked on an Assignment column (not ID, Name, Total, or Grade)
+            if (row != -1 && col >= 2 && col < columnNames.size() - 2) {
                 int studentId = (int) table.getValueAt(row, 0);
                 AssignmentScore currentAssignment = assignments.get(col - 2);
 
@@ -398,15 +423,24 @@ public class DashboardPanel extends JPanel {
                 if (input != null && !input.trim().isEmpty()) {
                     try {
                         double scoreVal = Double.parseDouble(input);
-                        if(scoreVal > currentAssignment.getMaxScore()) {
-                            JOptionPane.showMessageDialog(root, "Score cannot be higher than " + currentAssignment.getMaxScore());
+
+                        // --- VALIDATION: No Negative Scores ---
+                        if (scoreVal < 0) {
+                            JOptionPane.showMessageDialog(root, "Score cannot be negative.", "Validation Error", JOptionPane.ERROR_MESSAGE);
                             return;
                         }
+                        // --------------------------------------
+
+                        if(scoreVal > currentAssignment.getMaxScore()) {
+                            JOptionPane.showMessageDialog(root, "Score cannot be higher than " + currentAssignment.getMaxScore(), "Validation Error", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+
                         if (api.updateComponentScore(currentAssignment.getAssignmentId(), studentId, scoreVal)) {
                             showComponentGradebook(sectionId, courseName);
                         }
                     } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(root, "Invalid number.");
+                        JOptionPane.showMessageDialog(root, "Invalid number. Please enter a valid score.");
                     }
                 }
             } else {
@@ -428,52 +462,51 @@ public class DashboardPanel extends JPanel {
     }
 
     // ==========================================
-    // 5. STATISTICS
+    // 5. STATISTICS (UPDATED)
     // ==========================================
     private void showStatistics() {
         contentPanel.removeAll();
-        JPanel root = scaffold("Enrollment Statistics");
+        JPanel root = scaffold("Course Statistics");
 
-        List<InstructorCourseItem> courses = api.getMyCourses();
+        // 1. Fetch Calculated Data
+        List<edu.univ.erp.domain.CourseStats> statsList = api.getAllCourseStatistics();
 
-        JPanel statsContainer = new JPanel();
-        statsContainer.setLayout(new BoxLayout(statsContainer, BoxLayout.Y_AXIS));
-        statsContainer.setBorder(new EmptyBorder(20, 20, 20, 20));
-        statsContainer.setBackground(Color.WHITE); // Make sure background is visible
+        // 2. Setup Table Columns
+        String[] columnNames = {
+                "Course",
+                "Title",
+                "Enrolled",
+                "Graded",
+                "Min (%)",
+                "Max (%)",
+                "Avg (%)"
+        };
 
-        if (courses.isEmpty()) {
-            statsContainer.add(new JLabel("No courses assigned to generate statistics."));
-        } else {
-            for (InstructorCourseItem c : courses) {
-                JPanel row = new JPanel(new BorderLayout(10, 10));
-                row.setBorder(new EmptyBorder(0, 0, 15, 0));
-                row.setBackground(Color.WHITE);
+        DefaultTableModel model = new DefaultTableModel(columnNames, 0);
 
-                JLabel lblName = new JLabel(c.getCourseCode());
-                lblName.setPreferredSize(new Dimension(80, 20));
-
-                // Avoid divide by zero
-                int max = c.getCapacity() > 0 ? c.getCapacity() : 50;
-                JProgressBar bar = new JProgressBar(0, max);
-                bar.setValue(c.getEnrolledCount());
-                bar.setStringPainted(true);
-                bar.setString(c.getEnrolledCount() + " / " + max + " Enrolled");
-
-                // Color the bar based on fullness
-                if (c.getEnrolledCount() >= max) bar.setForeground(new Color(220, 53, 69)); // Red if full
-                else bar.setForeground(new Color(40, 167, 69)); // Green otherwise
-
-                row.add(lblName, BorderLayout.WEST);
-                row.add(bar, BorderLayout.CENTER);
-                statsContainer.add(row);
-            }
+        // 3. Populate Rows
+        for (edu.univ.erp.domain.CourseStats s : statsList) {
+            model.addRow(new Object[]{
+                    s.getCourseCode(),
+                    s.getCourseTitle(),
+                    s.getTotalEnrolled(),
+                    s.getGradesSubmitted(), // Count of students with grades
+                    String.format("%.2f", s.getMinScore()),
+                    String.format("%.2f", s.getMaxScore()),
+                    String.format("%.2f", s.getAvgScore())
+            });
         }
 
-        root.add(new JScrollPane(statsContainer), BorderLayout.CENTER);
+        JTable table = new JTable(model);
+        table.setRowHeight(30);
+        table.setEnabled(false); // Read-only view
+        table.setAutoCreateRowSorter(true); // Allow sorting by column
 
-        contentPanel.add(root);
-        contentPanel.revalidate();
-        contentPanel.repaint();
+        root.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // (Refresh button removed - navigation auto-refreshes)
+
+        refreshView(root);
     }
 
     // --- UTILITIES ---

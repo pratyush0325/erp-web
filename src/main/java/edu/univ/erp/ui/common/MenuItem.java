@@ -61,29 +61,26 @@ public class MenuItem {
         itemPanel.repaint();
     }
 
-    public void addMenuItem(String text, String icon, boolean selected) {
+    public void addMenuItem(String text, boolean selected) {
         // Store the selected state
         this.isSelected = selected;
 
-        itemPanel.setOpaque(selected); // Only opaque if selected
+        // --- FIX: Always keep it false so the parent gradient paints first ---
+        itemPanel.setOpaque(false);
+        // --------------------------------------------------------------------
+
         itemPanel.setBackground(selected ? selectedColor : ColorPalette.TRANSPARENT);
         itemPanel.setMaximumSize(new Dimension(240, 44));
         itemPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         itemPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-        JLabel iconLabel = new JLabel(icon);
-        iconLabel.setForeground(Color.WHITE);
-        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
 
         JLabel menuLabel = new JLabel(text);
         menuLabel.setFont(new Font("Raleway", selected ? Font.BOLD : Font.PLAIN, 15));
         menuLabel.setForeground(Color.WHITE);
 
         itemPanel.removeAll();
-        itemPanel.add(iconLabel);
         itemPanel.add(menuLabel);
 
-        // --- FIX 1: Tell the panel to update its layout and redraw ---
         itemPanel.revalidate();
         itemPanel.repaint();
     }

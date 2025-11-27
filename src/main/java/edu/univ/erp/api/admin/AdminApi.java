@@ -38,9 +38,6 @@ public class AdminApi {
         return adminStore.getAllSections();
     }
 
-    public boolean addSection(String courseId, int instructorId, String dayTime, String room, int capacity) {
-        return adminStore.addSection(courseId, instructorId, dayTime, room, capacity);
-    }
 
     public java.util.Map<Integer, String> getInstructors() {
         return adminStore.getInstructorsMap();
@@ -74,5 +71,9 @@ public class AdminApi {
 
     public boolean updateSection(int sectionId, String dayTime, String room, int capacity) {
         return adminStore.updateSection(sectionId, dayTime, room, capacity);
+    }
+
+    public boolean addSection(String courseId, int instructorId, String dayTime, String room, int capacity, String semester, int year) {
+        return adminStore.addSection(courseId, instructorId, dayTime, room, capacity, semester, year);
     }
 }
