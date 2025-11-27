@@ -108,7 +108,7 @@ public class DashboardPanel extends JPanel {
         JPanel grid = new JPanel(new GridLayout(2, 3, 16, 16));
         grid.setOpaque(false);
 
-        // Placeholder icons (use any)
+        // Placeholder icons
         Icon courseIcon = UIManager.getIcon("OptionPane.informationIcon");
         Icon regIcon    = UIManager.getIcon("OptionPane.questionIcon");
         Icon timeIcon   = UIManager.getIcon("OptionPane.warningIcon");
@@ -124,7 +124,47 @@ public class DashboardPanel extends JPanel {
         grid.add(new StatCard("Holds/Warnings", "0", "All clear", holdIcon));
 
         root.add(grid, BorderLayout.CENTER);
+
+        // --- NEW: Change Password Button ---
+        JButton btnPass = new JButton("Change Password");
+        btnPass.addActionListener(e -> showChangePasswordDialog());
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.setOpaque(false);
+        btnPanel.add(btnPass);
+        root.add(btnPanel, BorderLayout.SOUTH);
+        // -----------------------------------
+
         return root;
+    }
+
+    private void showChangePasswordDialog() {
+        JPasswordField txtPass = new JPasswordField();
+        JPasswordField txtConfirm = new JPasswordField();
+
+        Object[] msg = {
+                "New Password:", txtPass,
+                "Confirm Password:", txtConfirm
+        };
+
+        int opt = JOptionPane.showConfirmDialog(this, msg, "Change Password", JOptionPane.OK_CANCEL_OPTION);
+        if (opt == JOptionPane.OK_OPTION) {
+            String p1 = new String(txtPass.getPassword());
+            String p2 = new String(txtConfirm.getPassword());
+
+            if (p1.isEmpty() || !p1.equals(p2)) {
+                JOptionPane.showMessageDialog(this, "Passwords do not match or are empty.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Use a new instance of AuthApi to handle the request
+            edu.univ.erp.api.auth.AuthApi authApi = new edu.univ.erp.api.auth.AuthApi();
+            if (authApi.changePassword(p1)) {
+                JOptionPane.showMessageDialog(this, "Password changed successfully!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Error changing password.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     private JComponent buildCatalogPage() {
@@ -432,27 +472,65 @@ public class DashboardPanel extends JPanel {
 
     private JComponent buildProfilePage() {
         JPanel root = pageScaffold("Profile");
+
+        // 1. Fetch Real Data
+        edu.univ.erp.domain.StudentProfile profile = studentApi.getProfile();
+
+        if (profile == null) {
+            root.add(new JLabel("Profile data not found. Please contact Admin."), BorderLayout.CENTER);
+            return root;
+        }
+
+        // 2. Build Form
         JPanel form = new JPanel(new GridBagLayout());
         form.setOpaque(false);
         GridBagConstraints gc = new GridBagConstraints();
-        gc.insets = new Insets(6, 6, 6, 6);
+        gc.insets = new Insets(10, 10, 10, 10);
         gc.anchor = GridBagConstraints.WEST;
+        gc.fill = GridBagConstraints.HORIZONTAL;
 
-        int r = 0;
-        gc.gridx = 0; gc.gridy = r; form.add(new JLabel("Name"), gc);
-        gc.gridx = 1; form.add(new JTextField("Student Name", 20), gc);
-        r++;
-        gc.gridx = 0; gc.gridy = r; form.add(new JLabel("Roll No"), gc);
-        gc.gridx = 1; form.add(new JTextField("2025XXXX", 20), gc);
-        r++;
-        gc.gridx = 0; gc.gridy = r; form.add(new JLabel("Program"), gc);
-        gc.gridx = 1; form.add(new JTextField("B.Tech CSE", 20), gc);
-        r++;
-        gc.gridx = 0; gc.gridy = r; form.add(new JLabel("Year"), gc);
-        gc.gridx = 1; form.add(new JTextField("3", 20), gc);
+        // Helper to add rows
+        addProfileRow(form, gc, 0, "Name:", profile.getName());
+        addProfileRow(form, gc, 1, "Roll No:", profile.getRollNo());
+        addProfileRow(form, gc, 2, "Program:", profile.getProgram());
+        addProfileRow(form, gc, 3, "Year:", String.valueOf(profile.getYear()));
 
-        root.add(form, BorderLayout.NORTH);
+        // Add a "logout" hint or button
+        gc.gridy = 4;
+        gc.gridx = 1;
+        gc.weighty = 1.0; // push to top
+        gc.anchor = GridBagConstraints.NORTHWEST;
+        JLabel hint = new JLabel("To change details, contact Administrator.");
+        hint.setFont(new Font("SansSerif", Font.ITALIC, 12));
+        hint.setForeground(ColorPalette.TEXT_MUTED);
+        form.add(hint, gc);
+
+        root.add(form, BorderLayout.CENTER);
         return root;
+    }
+
+    private void addProfileRow(JPanel panel, GridBagConstraints gc, int row, String label, String value) {
+        gc.gridy = row;
+
+        // Label
+        gc.gridx = 0;
+        gc.weightx = 0;
+        JLabel lbl = new JLabel(label);
+        lbl.setFont(new Font("Raleway", Font.BOLD, 14));
+        lbl.setForeground(ColorPalette.TEXT_DARK);
+        panel.add(lbl, gc);
+
+        // Field (Read-only)
+        gc.gridx = 1;
+        gc.weightx = 1.0;
+        JTextField txt = new JTextField(value);
+        txt.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        txt.setEditable(false); // Make it read-only
+        txt.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(5, 8, 5, 8))
+        );
+        panel.add(txt, gc);
     }
 
     private JPanel pageScaffold(String heading) {

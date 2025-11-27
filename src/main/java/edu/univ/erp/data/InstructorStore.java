@@ -73,8 +73,12 @@ public class InstructorStore {
     }
 
 
-    public boolean updateGrade(int studentId, int sectionId, String newGrade) {
-        String query = "UPDATE enrollments SET grade = ? WHERE student_id = ? AND section_id = ?";
+    // Secure version: Ensures the instructor actually teaches this section
+    public boolean updateGrade(int instructorId, int studentId, int sectionId, String newGrade) {
+        String query = "UPDATE enrollments e " +
+                "JOIN sections s ON e.section_id = s.section_id " +
+                "SET e.grade = ? " +
+                "WHERE e.student_id = ? AND e.section_id = ? AND s.instructor_id = ?";
 
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
              PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -82,9 +86,41 @@ public class InstructorStore {
             stmt.setString(1, newGrade);
             stmt.setInt(2, studentId);
             stmt.setInt(3, sectionId);
+            stmt.setInt(4, instructorId); // <--- Security Check
 
-            int rows = stmt.executeUpdate();
-            return rows > 0;
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Secure version: Checks assignment ownership via section -> instructor
+    public boolean updateStudentScore(int instructorId, int assignmentId, int studentId, double score) {
+        // 1. First, verify ownership
+        String checkSql = "SELECT 1 FROM course_assignments ca " +
+                "JOIN sections s ON ca.section_id = s.section_id " +
+                "WHERE ca.assignment_id = ? AND s.instructor_id = ?";
+
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
+            try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+                checkStmt.setInt(1, assignmentId);
+                checkStmt.setInt(2, instructorId);
+                ResultSet rs = checkStmt.executeQuery();
+                if (!rs.next()) return false; // Instructor does not own this assignment
+            }
+
+            // 2. Perform the update
+            String updateSql = "INSERT INTO student_scores (assignment_id, student_id, score_obtained) VALUES (?, ?, ?) " +
+                    "ON DUPLICATE KEY UPDATE score_obtained = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(updateSql)) {
+                stmt.setInt(1, assignmentId);
+                stmt.setInt(2, studentId);
+                stmt.setDouble(3, score);
+                stmt.setDouble(4, score);
+                stmt.executeUpdate();
+                return true;
+            }
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -166,21 +202,61 @@ public class InstructorStore {
     /**
      * Creates a new assignment definition in the database.
      */
-    public boolean addAssignment(int sectionId, String name, int maxScore, int weight) {
-        String query = "INSERT INTO course_assignments (section_id, assignment_name, max_score, weight_percent) VALUES (?, ?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+    public boolean configureWeights(int sectionId, int quizWeight, int midWeight, int endWeight) {
+        Connection conn = null;
+        try {
+            conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+            conn.setAutoCommit(false); // Transaction to ensure atomic update
 
-            stmt.setInt(1, sectionId);
-            stmt.setString(2, name);
-            stmt.setInt(3, maxScore);
-            stmt.setInt(4, weight);
+            // Ensure all 3 exist and have correct weights
+            if (!ensureComponent(conn, sectionId, "Quiz", quizWeight)) throw new SQLException("Failed Quiz");
+            if (!ensureComponent(conn, sectionId, "Midterm", midWeight)) throw new SQLException("Failed Midterm");
+            if (!ensureComponent(conn, sectionId, "End-Sem", endWeight)) throw new SQLException("Failed End-Sem");
 
-            return stmt.executeUpdate() > 0;
+            conn.commit();
+            return true;
         } catch (SQLException e) {
             e.printStackTrace();
+            if (conn != null) try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
             return false;
+        } finally {
+            if (conn != null) try { conn.close(); } catch (SQLException ex) { ex.printStackTrace(); }
         }
+    }
+
+    // Helper to Insert or Update a specific component
+    private boolean ensureComponent(Connection conn, int sectionId, String name, int weight) throws SQLException {
+        // 1. Check if it exists
+        String checkSql = "SELECT assignment_id FROM course_assignments WHERE section_id = ? AND assignment_name = ?";
+        int assignmentId = -1;
+
+        try (PreparedStatement stmt = conn.prepareStatement(checkSql)) {
+            stmt.setInt(1, sectionId);
+            stmt.setString(2, name);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) assignmentId = rs.getInt(1);
+            }
+        }
+
+        if (assignmentId != -1) {
+            // 2. Update existing
+            String updateSql = "UPDATE course_assignments SET weight_percent = ? WHERE assignment_id = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(updateSql)) {
+                stmt.setInt(1, weight);
+                stmt.setInt(2, assignmentId);
+                stmt.executeUpdate();
+            }
+        } else {
+            // 3. Create new (Default Max Score = 100)
+            String insertSql = "INSERT INTO course_assignments (section_id, assignment_name, max_score, weight_percent) VALUES (?, ?, 100, ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                stmt.setInt(1, sectionId);
+                stmt.setString(2, name);
+                stmt.setInt(3, weight);
+                stmt.executeUpdate();
+            }
+        }
+        return true;
     }
 } // <--- End of class
 

@@ -37,4 +37,11 @@ public class AuthApi {
     public void logout() {
         UserSession.getInstance().endSession();
     }
+
+    // ... existing code ...
+
+    public boolean changePassword(String newPassword) {
+        int userId = UserSession.getInstance().getUserId();
+        return authService.changePassword(userId, newPassword);
+    }
 }

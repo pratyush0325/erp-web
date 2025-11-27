@@ -24,8 +24,9 @@ public class InstructorApi {
     // --- WRITE OPERATIONS (Blocked in Maintenance) ---
 
     public boolean assignGrade(int studentId, int sectionId, String grade) {
-        if (MaintenanceApi.isMaintenanceOn()) return false; // <--- BLOCK
-        return instructorStore.updateGrade(studentId, sectionId, grade);
+        if (MaintenanceApi.isMaintenanceOn()) return false;
+        int instructorId = UserSession.getInstance().getUserId(); // <--- Get ID
+        return instructorStore.updateGrade(instructorId, studentId, sectionId, grade);
     }
 
     public List<AssignmentScore> getCourseAssignments(int sectionId) {
@@ -37,12 +38,13 @@ public class InstructorApi {
     }
 
     public boolean updateComponentScore(int assignmentId, int studentId, double score) {
-        if (MaintenanceApi.isMaintenanceOn()) return false; // <--- BLOCK
-        return instructorStore.updateStudentScore(assignmentId, studentId, score);
+        if (MaintenanceApi.isMaintenanceOn()) return false;
+        int instructorId = UserSession.getInstance().getUserId(); // <--- Get ID
+        return instructorStore.updateStudentScore(instructorId, assignmentId, studentId, score);
     }
 
-    public boolean createAssignment(int sectionId, String name, int maxScore, int weight) {
-        if (MaintenanceApi.isMaintenanceOn()) return false; // <--- BLOCK
-        return instructorStore.addAssignment(sectionId, name, maxScore, weight);
+    public boolean saveWeights(int sectionId, int q, int m, int e) {
+        if (MaintenanceApi.isMaintenanceOn()) return false;
+        return instructorStore.configureWeights(sectionId, q, m, e);
     }
 }

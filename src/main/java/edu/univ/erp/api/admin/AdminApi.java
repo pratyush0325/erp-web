@@ -12,8 +12,8 @@ public class AdminApi {
         return adminStore.getAllUsers();
     }
 
-    public boolean addUser(String username, String password, String role, String extra1, String extra2) {
-        return adminStore.addUser(username, password, role, extra1, extra2);
+    public boolean addUser(String username, String password, String role, String extra1, String extra2, String extra3) {
+        return adminStore.addUser(username, password, role, extra1, extra2, extra3);
     }
 
     public List<edu.univ.erp.domain.Course> getCourses() {
@@ -43,5 +43,26 @@ public class AdminApi {
 
     public void setMaintenance(boolean on) {
         edu.univ.erp.api.maintenance.MaintenanceApi.setMaintenance(on);
+    }
+
+    public edu.univ.erp.domain.AdminStats getStats() {
+        return adminStore.getDashboardStats();
+    }
+
+    // --- DELETE / EDIT ---
+    public boolean deleteUser(int userId) {
+        return adminStore.deleteUser(userId);
+    }
+
+    public boolean deleteCourse(String code) {
+        return adminStore.deleteCourse(code);
+    }
+
+    public boolean deleteSection(int sectionId) {
+        return adminStore.deleteSection(sectionId);
+    }
+
+    public boolean updateSection(int sectionId, String dayTime, String room, int capacity) {
+        return adminStore.updateSection(sectionId, dayTime, room, capacity);
     }
 }

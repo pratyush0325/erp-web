@@ -12,7 +12,7 @@ import edu.univ.erp.api.student.DropStatus;
 public class StudentApi {
 
     private final RegistrationStore registrationStore = new RegistrationStore();
-
+    private final edu.univ.erp.data.ProfileStore profileStore = new edu.univ.erp.data.ProfileStore();
     /**
      * Gets the list of registered courses for the *currently logged-in* student.
      *
@@ -56,5 +56,10 @@ public class StudentApi {
     public java.util.List<edu.univ.erp.domain.StudentGradeView> getMyGrades() {
         int studentId = edu.univ.erp.auth.session.UserSession.getInstance().getUserId();
         return registrationStore.getGradesForStudent(studentId);
+    }
+
+    public edu.univ.erp.domain.StudentProfile getProfile() {
+        int studentId = UserSession.getInstance().getUserId();
+        return profileStore.getStudentProfile(studentId);
     }
 }

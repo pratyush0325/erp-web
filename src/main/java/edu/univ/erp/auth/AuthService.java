@@ -32,4 +32,12 @@ public class AuthService {
             return new LoginResult(LoginStatus.INVALID_PASSWORD, null, 0);
         }
     }
+
+    // ... existing code ...
+
+    public boolean changePassword(int userId, String newPassword) {
+        // Hash the password using BCrypt
+        String hash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+        return authStore.updatePassword(userId, hash);
+    }
 }

@@ -41,4 +41,21 @@ public class AuthStore {
         }
         return null; // User not found or DB error
     }
+
+    // ... existing code ...
+
+    public boolean updatePassword(int userId, String newHash) {
+        String query = "UPDATE users_auth SET password_hash = ? WHERE user_id = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, newHash);
+            stmt.setInt(2, userId);
+
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

@@ -103,7 +103,7 @@ public class DashboardPanel extends JPanel {
         // Add Cards
         cardsPanel.add(createStatCard("Active Courses", String.valueOf(totalCourses), new Color(0xE1F5FE)));
         cardsPanel.add(createStatCard("Total Students", String.valueOf(totalStudents), new Color(0xE8F5E9)));
-        cardsPanel.add(createStatCard("Pending Grades", "5", new Color(0xFFF3E0))); // Dummy data
+        cardsPanel.add(createStatCard("Pending Grades", "5", new Color(0xFFF3E0)));
 
         // Welcome Text
         JTextArea info = new JTextArea("Welcome, Instructor.\n\n" +
@@ -121,7 +121,45 @@ public class DashboardPanel extends JPanel {
 
         root.add(container, BorderLayout.NORTH);
 
+        // --- NEW: Change Password Button ---
+        JButton btnPass = new JButton("Change Password");
+        btnPass.addActionListener(e -> showChangePasswordDialog());
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(btnPass);
+        root.add(btnPanel, BorderLayout.SOUTH);
+        // -----------------------------------
+
         refreshView(root);
+    }
+
+    private void showChangePasswordDialog() {
+        JPasswordField txtPass = new JPasswordField();
+        JPasswordField txtConfirm = new JPasswordField();
+
+        Object[] msg = {
+                "New Password:", txtPass,
+                "Confirm Password:", txtConfirm
+        };
+
+        int opt = JOptionPane.showConfirmDialog(this, msg, "Change Password", JOptionPane.OK_CANCEL_OPTION);
+        if (opt == JOptionPane.OK_OPTION) {
+            String p1 = new String(txtPass.getPassword());
+            String p2 = new String(txtConfirm.getPassword());
+
+            if (p1.isEmpty() || !p1.equals(p2)) {
+                JOptionPane.showMessageDialog(this, "Passwords do not match or are empty.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Use a new instance of AuthApi
+            edu.univ.erp.api.auth.AuthApi authApi = new edu.univ.erp.api.auth.AuthApi();
+            if (authApi.changePassword(p1)) {
+                JOptionPane.showMessageDialog(this, "Password changed successfully!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Error changing password.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     private JPanel createStatCard(String title, String value, Color bgColor) {
@@ -235,21 +273,27 @@ public class DashboardPanel extends JPanel {
         contentPanel.removeAll();
         JPanel root = scaffold("Grading: " + courseName);
 
-        // 1. Fetch Assignments
+        // 1. Fetch Assignments (Should be Quiz, Midterm, End-Sem if configured)
         List<AssignmentScore> assignments = api.getCourseAssignments(sectionId);
 
-        // Setup Columns: ID, Name, [Components...], Total
+        // Setup Columns
         Vector<String> columnNames = new Vector<>();
         columnNames.add("Student ID");
         columnNames.add("Name");
 
-        // Add columns for each assignment with their weight in the header
+        // Helper vars to pre-fill the dialog later
+        int wQ = 0, wM = 0, wE = 0;
+
         for (AssignmentScore assign : assignments) {
             columnNames.add(String.format("%s (%d%%)", assign.getAssignmentName(), assign.getWeight()));
+            // Capture current weights for the dialog
+            if ("Quiz".equals(assign.getAssignmentName())) wQ = assign.getWeight();
+            if ("Midterm".equals(assign.getAssignmentName())) wM = assign.getWeight();
+            if ("End-Sem".equals(assign.getAssignmentName())) wE = assign.getWeight();
         }
-        columnNames.add("Total (%)"); // The Calculated Column
+        columnNames.add("Total (%)");
 
-        // 2. Fetch Students & Build Rows
+        // 2. Build Data Rows
         List<StudentGradeItem> students = api.getClassList(sectionId);
         DefaultTableModel model = new DefaultTableModel(columnNames, 0);
 
@@ -259,20 +303,14 @@ public class DashboardPanel extends JPanel {
             row.add(student.getName());
 
             double totalWeightedScore = 0.0;
-
-            // Fill assignment scores and calculate total
             for (AssignmentScore assign : assignments) {
                 Double score = api.getScore(student.getStudentId(), assign.getAssignmentId());
                 row.add(score == null ? "-" : String.valueOf(score));
-
-                // Math: (Score / Max) * Weight
                 if (score != null) {
                     double percentage = score / assign.getMaxScore();
                     totalWeightedScore += percentage * assign.getWeight();
                 }
             }
-
-            // Add the calculated total at the end
             row.add(String.format("%.2f%%", totalWeightedScore));
             model.addRow(row);
         }
@@ -283,71 +321,74 @@ public class DashboardPanel extends JPanel {
 
         // --- BUTTONS ---
         JButton btnBack = new JButton("Back");
-        JButton btnEnterMark = new JButton("Enter Mark");
-        JButton btnAddComponent = new JButton("Add Component");
 
+        // NEW: Configure Weights Button
+        JButton btnWeights = new JButton("Configure Grading");
+        if (assignments.isEmpty()) {
+            btnWeights.setText("Setup Grading (Required)");
+            btnWeights.setForeground(new Color(220, 53, 69)); // Red to alert user
+        }
+
+        JButton btnEnterMark = new JButton("Enter Mark");
         btnEnterMark.setEnabled(false);
 
         table.getSelectionModel().addListSelectionListener(e ->
                 btnEnterMark.setEnabled(table.getSelectedRow() != -1)
         );
 
-        // Logic: Add Component
-        btnAddComponent.addActionListener(e -> {
-            // --- 1. BLOCK IF MAINTENANCE IS ON ---
+        // Logic: Configure Weights
+        int finalWQ = wQ; int finalWM = wM; int finalWE = wE; // eff-final for lambda
+        btnWeights.addActionListener(e -> {
             if (MaintenanceApi.isMaintenanceOn()) {
-                JOptionPane.showMessageDialog(root, "System is under maintenance. You cannot add components.", "Blocked", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(root, "Maintenance Mode ON. Changes disabled.", "Blocked", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            // -------------------------------------
 
-            JTextField nameField = new JTextField();
-            JTextField maxField = new JTextField("100");
-            JTextField weightField = new JTextField("20");
+            JTextField txtQuiz = new JTextField(String.valueOf(finalWQ > 0 ? finalWQ : 20));
+            JTextField txtMid = new JTextField(String.valueOf(finalWM > 0 ? finalWM : 30));
+            JTextField txtEnd = new JTextField(String.valueOf(finalWE > 0 ? finalWE : 50));
 
-            Object[] message = {
-                    "Component Name (e.g., Lab 1):", nameField,
-                    "Max Score:", maxField,
-                    "Weight (%):", weightField
-            };
+            JPanel panel = new JPanel(new GridLayout(0, 2));
+            panel.add(new JLabel("Quiz Weight (%):")); panel.add(txtQuiz);
+            panel.add(new JLabel("Midterm Weight (%):")); panel.add(txtMid);
+            panel.add(new JLabel("End-Sem Weight (%):")); panel.add(txtEnd);
+            panel.add(new JLabel("Note: Max Score defaults to 100")); panel.add(new JLabel(""));
 
-            int option = JOptionPane.showConfirmDialog(root, message, "Add Grading Component", JOptionPane.OK_CANCEL_OPTION);
-            if (option == JOptionPane.OK_OPTION) {
+            int result = JOptionPane.showConfirmDialog(root, panel, "Configure Grading Scheme", JOptionPane.OK_CANCEL_OPTION);
+            if (result == JOptionPane.OK_OPTION) {
                 try {
-                    String name = nameField.getText();
-                    int max = Integer.parseInt(maxField.getText());
-                    int weight = Integer.parseInt(weightField.getText());
+                    int q = Integer.parseInt(txtQuiz.getText());
+                    int m = Integer.parseInt(txtMid.getText());
+                    int end = Integer.parseInt(txtEnd.getText());
 
-                    boolean success = api.createAssignment(sectionId, name, max, weight);
-                    if (success) {
-                        JOptionPane.showMessageDialog(root, "Component Added!");
-                        showComponentGradebook(sectionId, courseName); // Refresh to show new column
-                    } else {
-                        JOptionPane.showMessageDialog(root, "Failed to add component.");
+                    if (q + m + end != 100) {
+                        JOptionPane.showMessageDialog(root, "Weights must sum to exactly 100%. (Current: " + (q+m+end) + "%)", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
                     }
-                } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(root, "Invalid input. Please enter numbers for Max and Weight.");
+
+                    if (api.saveWeights(sectionId, q, m, end)) {
+                        JOptionPane.showMessageDialog(root, "Grading scheme updated!");
+                        showComponentGradebook(sectionId, courseName); // Refresh
+                    } else {
+                        JOptionPane.showMessageDialog(root, "Failed to save.");
+                    }
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(root, "Please enter valid integers.");
                 }
             }
         });
 
-        // Logic: Enter Mark
+        // Logic: Enter Mark (Same as before)
         btnEnterMark.addActionListener(e -> {
-            // --- 2. BLOCK IF MAINTENANCE IS ON ---
             if (MaintenanceApi.isMaintenanceOn()) {
-                JOptionPane.showMessageDialog(root, "System is under maintenance. You cannot enter grades.", "Blocked", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(root, "Maintenance Mode ON.", "Blocked", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            // -------------------------------------
-
             int row = table.getSelectedRow();
             int col = table.getSelectedColumn();
 
-            // Valid columns are indices 2 to (size - 2)
-            // (Skip ID, Name, and the Total column at the end)
             if (row != -1 && col >= 2 && col < columnNames.size() - 1) {
                 int studentId = (int) table.getValueAt(row, 0);
-                String studentName = (String) table.getValueAt(row, 1);
                 AssignmentScore currentAssignment = assignments.get(col - 2);
 
                 String input = JOptionPane.showInputDialog(root,
@@ -361,17 +402,15 @@ public class DashboardPanel extends JPanel {
                             JOptionPane.showMessageDialog(root, "Score cannot be higher than " + currentAssignment.getMaxScore());
                             return;
                         }
-                        boolean success = api.updateComponentScore(currentAssignment.getAssignmentId(), studentId, scoreVal);
-                        if (success) {
-                            // Refresh the whole page to recalculate the "Total" column
+                        if (api.updateComponentScore(currentAssignment.getAssignmentId(), studentId, scoreVal)) {
                             showComponentGradebook(sectionId, courseName);
                         }
-                    } catch (NumberFormatException ex) {
-                        JOptionPane.showMessageDialog(root, "Please enter a valid number.");
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(root, "Invalid number.");
                     }
                 }
             } else {
-                JOptionPane.showMessageDialog(root, "Please click on a specific assignment cell to grade (not the Total).");
+                JOptionPane.showMessageDialog(root, "Click on a specific Quiz/Exam cell to grade.");
             }
         });
 
@@ -379,7 +418,7 @@ public class DashboardPanel extends JPanel {
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         btnPanel.add(btnBack);
-        btnPanel.add(btnAddComponent);
+        btnPanel.add(btnWeights);
         btnPanel.add(btnEnterMark);
 
         root.add(new JScrollPane(table), BorderLayout.CENTER);

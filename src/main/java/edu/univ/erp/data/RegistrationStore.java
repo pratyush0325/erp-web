@@ -60,19 +60,32 @@ public class RegistrationStore {
      * Checks if a student is already enrolled in a specific section.
      * @return true if an enrollment record exists, false otherwise.
      */
+    /**
+     * Checks if a student is already enrolled in ANY section of this COURSE.
+     * Prevents registering for duplicate sections (e.g., Section A and Section B of CS101).
+     */
     public boolean isAlreadyRegistered(int studentId, int sectionId) {
-        String query = "SELECT 1 FROM enrollments WHERE student_id = ? AND section_id = ?";
+        // UPDATED QUERY:
+        // 1. Find the course_id of the target section (subquery).
+        // 2. Check if the student has an enrollment in any section with that course_id.
+        String query = "SELECT 1 " +
+                "FROM enrollments e " +
+                "JOIN sections s ON e.section_id = s.section_id " +
+                "WHERE e.student_id = ? " +
+                "AND s.course_id = (SELECT course_id FROM sections WHERE section_id = ?)";
+
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
              PreparedStatement stmt = conn.prepareStatement(query)) {
 
             stmt.setInt(1, studentId);
             stmt.setInt(2, sectionId);
+
             try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next(); // true if a record was found
+                return rs.next(); // If true, they are already taking this course!
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            return true; // Fail-safe: assume registered to prevent duplicates on error
+            return true; // Fail-safe
         }
     }
 
