@@ -5,5 +5,6 @@ public enum RegistrationStatus {
     ALREADY_REGISTERED,
     SECTION_FULL,
     ERROR_UNKNOWN,
-    MAINTENANCE_MODE // <--- NEW
+    MAINTENANCE_MODE, // <--- NEW
+    DEADLINE_PASSED
 }

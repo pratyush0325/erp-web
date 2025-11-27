@@ -228,6 +228,10 @@ public class DashboardPanel extends JPanel {
                     message = "System is under maintenance. Registration is disabled.";
                     messageType = JOptionPane.WARNING_MESSAGE;
                     break;
+                case DEADLINE_PASSED: // <--- NEW
+                    message = "Registration is closed. The deadline has passed.";
+                    messageType = JOptionPane.ERROR_MESSAGE;
+                    break;
                 case SUCCESS:
                     message = "Successfully registered for the course!";
                     messageType = JOptionPane.INFORMATION_MESSAGE;
@@ -286,6 +290,10 @@ public class DashboardPanel extends JPanel {
                 case MAINTENANCE_MODE:
                     message = "System is under maintenance. You cannot drop courses now.";
                     messageType = JOptionPane.WARNING_MESSAGE;
+                    break;
+                case DEADLINE_PASSED:
+                    message = "Cannot drop course. The deadline has passed.";
+                    messageType = JOptionPane.ERROR_MESSAGE;
                     break;
                 case SUCCESS:
                     message = "Successfully dropped the section.";

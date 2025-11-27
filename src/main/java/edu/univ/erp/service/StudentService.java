@@ -1,52 +1,53 @@
 package edu.univ.erp.service;
 
-import edu.univ.erp.api.maintenance.MaintenanceApi; // <--- Import this
+import edu.univ.erp.api.maintenance.MaintenanceApi;
 import edu.univ.erp.api.student.DropStatus;
 import edu.univ.erp.api.student.RegistrationStatus;
 import edu.univ.erp.data.RegistrationStore;
+import edu.univ.erp.data.SettingsStore; // <--- Import
+import java.time.LocalDate;
 
 public class StudentService {
 
     private final RegistrationStore regStore = new RegistrationStore();
+    private final SettingsStore settingsStore = new SettingsStore(); // <--- New Instance
 
     public RegistrationStatus registerStudent(int studentId, int sectionId) {
-        // 1. Check Maintenance Mode FIRST
-        if (MaintenanceApi.isMaintenanceOn()) {
-            return RegistrationStatus.MAINTENANCE_MODE;
-        }
+        // 1. Maintenance Check
+        if (MaintenanceApi.isMaintenanceOn()) return RegistrationStatus.MAINTENANCE_MODE;
 
-        // Rule 2: Check for duplicate registration
-        if (regStore.isAlreadyRegistered(studentId, sectionId)) {
-            return RegistrationStatus.ALREADY_REGISTERED;
-        }
+        // 2. Deadline Check (NEW)
+        if (isPastDeadline()) return RegistrationStatus.DEADLINE_PASSED;
 
-        // Rule 3: Check for available seats
-        int currentEnrollment = regStore.getSectionEnrollmentCount(sectionId);
-        int capacity = regStore.getSectionCapacity(sectionId);
+        // 3. Logic Checks
+        if (regStore.isAlreadyRegistered(studentId, sectionId)) return RegistrationStatus.ALREADY_REGISTERED;
 
-        if (currentEnrollment >= capacity) {
-            return RegistrationStatus.SECTION_FULL;
-        }
+        int current = regStore.getSectionEnrollmentCount(sectionId);
+        int cap = regStore.getSectionCapacity(sectionId);
+        if (current >= cap) return RegistrationStatus.SECTION_FULL;
 
-        boolean success = regStore.createEnrollment(studentId, sectionId);
-        return success ? RegistrationStatus.SUCCESS : RegistrationStatus.ERROR_UNKNOWN;
+        return regStore.createEnrollment(studentId, sectionId) ? RegistrationStatus.SUCCESS : RegistrationStatus.ERROR_UNKNOWN;
     }
 
     public DropStatus dropStudent(int studentId, int sectionId) {
-        // 1. Check Maintenance Mode FIRST
-        if (MaintenanceApi.isMaintenanceOn()) {
-            return DropStatus.MAINTENANCE_MODE;
-        }
+        // 1. Maintenance Check
+        if (MaintenanceApi.isMaintenanceOn()) return DropStatus.MAINTENANCE_MODE;
 
+        // 2. Deadline Check (NEW)
+        if (isPastDeadline()) return DropStatus.DEADLINE_PASSED;
+
+        // 3. Logic Checks
         boolean success = regStore.deleteEnrollment(studentId, sectionId);
+        if (success) return DropStatus.SUCCESS;
 
-        if (success) {
-            return DropStatus.SUCCESS;
-        } else {
-            if (!regStore.isAlreadyRegistered(studentId, sectionId)) {
-                return DropStatus.NOT_REGISTERED;
-            }
-            return DropStatus.ERROR_UNKNOWN;
-        }
+        if (!regStore.isAlreadyRegistered(studentId, sectionId)) return DropStatus.NOT_REGISTERED;
+        return DropStatus.ERROR_UNKNOWN;
+    }
+
+    // --- Helper Method ---
+    private boolean isPastDeadline() {
+        LocalDate deadline = settingsStore.getRegistrationDeadline();
+        if (deadline == null) return false; // No deadline set = always open
+        return LocalDate.now().isAfter(deadline);
     }
 }

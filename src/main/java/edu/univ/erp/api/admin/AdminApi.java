@@ -7,9 +7,19 @@ import java.util.List;
 public class AdminApi {
 
     private final AdminStore adminStore = new AdminStore();
+    private final edu.univ.erp.data.SettingsStore settingsStore = new edu.univ.erp.data.SettingsStore();
 
     public List<UserAdminItem> getUsers() {
         return adminStore.getAllUsers();
+    }
+
+    public String getDeadline() {
+        java.time.LocalDate date = settingsStore.getRegistrationDeadline();
+        return (date != null) ? date.toString() : "";
+    }
+
+    public void setDeadline(String date) {
+        settingsStore.setRegistrationDeadline(date);
     }
 
     public boolean addUser(String username, String password, String role, String extra1, String extra2, String extra3) {

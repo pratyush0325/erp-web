@@ -542,35 +542,71 @@ public class DashboardPanel extends JPanel {
     // 5. MAINTENANCE
     // ---------------------------------------------------------
     private JComponent buildMaintenance() {
-        JPanel root = scaffold("Maintenance Mode");
+        JPanel root = scaffold("System Settings");
 
-        // 1. Create Checkbox
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setOpaque(false);
+        content.setBorder(new EmptyBorder(20, 0, 0, 0));
+
+        // --- 1. Maintenance Mode Toggle ---
+        JPanel pnlMaint = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        pnlMaint.setOpaque(false);
+
         JCheckBox toggle = new JCheckBox("Enable Maintenance Mode");
         toggle.setFont(new Font("Raleway", Font.BOLD, 16));
         toggle.setOpaque(false);
-
-        // 2. Set initial state from DB
         toggle.setSelected(adminApi.isMaintenanceOn());
 
-        // 3. Add Listener
         toggle.addActionListener(e -> {
             boolean isSelected = toggle.isSelected();
             adminApi.setMaintenance(isSelected);
-
             String status = isSelected ? "ON" : "OFF";
             JOptionPane.showMessageDialog(this, "Maintenance Mode is now " + status);
         });
 
-        // Layout
-        JPanel content = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        content.setOpaque(false);
-        content.add(toggle);
+        pnlMaint.add(toggle);
+        content.add(pnlMaint);
 
-        JTextArea hint = new JTextArea("When enabled:\n- Students cannot register/drop.\n- Instructors cannot edit grades.\n- A banner will be shown to all users.");
+        // --- 2. Registration Deadline ---
+        JPanel pnlDate = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        pnlDate.setOpaque(false);
+
+        JLabel lblDate = new JLabel("Registration Deadline (YYYY-MM-DD): ");
+        lblDate.setFont(new Font("Raleway", Font.PLAIN, 14));
+
+        JTextField txtDate = new JTextField(12);
+        txtDate.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        txtDate.setText(adminApi.getDeadline()); // Load current value
+
+        JButton btnSaveDate = new JButton("Update Deadline");
+        btnSaveDate.addActionListener(e -> {
+            String input = txtDate.getText().trim();
+            // Simple validation regex for YYYY-MM-DD
+            if (input.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                adminApi.setDeadline(input);
+                JOptionPane.showMessageDialog(this, "Deadline updated to " + input);
+            } else {
+                JOptionPane.showMessageDialog(this, "Invalid format. Use YYYY-MM-DD.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        pnlDate.add(lblDate);
+        pnlDate.add(txtDate);
+        pnlDate.add(btnSaveDate);
+
+        content.add(Box.createVerticalStrut(20)); // Spacer
+        content.add(pnlDate);
+
+        // --- Instructions ---
+        JTextArea hint = new JTextArea(
+                "\nMaintenance Mode:\n" + "• Blocks all student/instructor changes.\n" + "• Useful during grade processing or updates.\n\n" + "Deadline:\n" + "• Students cannot Register or Drop after this date.\n" + "• Format must be exact (YYYY-MM-DD)."
+        );
         hint.setEditable(false);
         hint.setOpaque(false);
-        hint.setBorder(new EmptyBorder(10, 10, 10, 10));
+        hint.setBorder(new EmptyBorder(20, 10, 10, 10));
         hint.setForeground(Color.DARK_GRAY);
+        hint.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
         root.add(content, BorderLayout.CENTER);
         root.add(hint, BorderLayout.SOUTH);
