@@ -49,6 +49,7 @@ public class DashboardPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel cards = new JPanel(cardLayout);
     private final JPanel maintenanceBanner = new JPanel(new BorderLayout());
+    private DefaultTableModel timetableModel; // <--- NEW FIELD
 
     public DashboardPanel() {
         setLayout(new BorderLayout());
@@ -79,7 +80,19 @@ public class DashboardPanel extends JPanel {
         boolean isMaint = edu.univ.erp.api.maintenance.MaintenanceApi.isMaintenanceOn();
         setMaintenanceMode(isMaint);
 
-        // 2. Show the requested card
+        // 2. Refresh specific pages when opened
+        if (PAGE_TIMETABLE.equals(key)) {
+            refreshTimetable(); // <--- AUTO REFRESH
+        }
+        if (PAGE_REGISTRATIONS.equals(key)) {
+            refreshRegistrationsPage();
+        }
+        if (PAGE_GRADES.equals(key)) {
+            // We can also auto-refresh grades here if we want
+            // (You'd need to refactor buildGradesPage similarly to use a class-level model)
+        }
+
+        // 3. Show the card
         cardLayout.show(cards, key);
     }
 
@@ -261,14 +274,48 @@ public class DashboardPanel extends JPanel {
 
     private JComponent buildTimetablePage() {
         JPanel root = pageScaffold("Timetable");
-        JTextArea info = new JTextArea("Your registered sections by day/time.\n\n" +
-                "Mon 10:00  CSE212-1  Data Structures (Lec)\n" +
-                "Wed 10:00  CSE212-1  Data Structures (Lec)\n" +
-                "Fri 14:00  CSE212-L1 Data Structures (Lab)");
-        info.setEditable(false);
-        info.setFont(new Font("Monospaced", Font.PLAIN, 13));
-        root.add(new JScrollPane(info), BorderLayout.CENTER);
+
+        String[] columns = {"Day/Time", "Code", "Title", "Room"};
+        timetableModel = new DefaultTableModel(columns, 0);
+        JTable table = new JTable(timetableModel);
+        decorateTable(table);
+        table.setAutoCreateRowSorter(true);
+
+        root.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // Refresh Button
+        JButton btnRefresh = new JButton("Refresh Timetable");
+        btnRefresh.addActionListener(e -> refreshTimetable()); // <--- Calls the helper directly
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.setOpaque(false);
+        btnPanel.add(btnRefresh);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
+        // Load initial data
+        refreshTimetable();
+
         return root;
+    }
+
+    private void refreshTimetable() {
+        if (timetableModel == null) return;
+
+        // 1. Clear existing rows
+        timetableModel.setRowCount(0);
+
+        // 2. Fetch fresh data from DB
+        java.util.List<edu.univ.erp.domain.RegistrationItem> items = studentApi.getMyRegistrations();
+
+        // 3. Populate table
+        for (edu.univ.erp.domain.RegistrationItem item : items) {
+            timetableModel.addRow(new Object[]{
+                    item.getSchedule(),
+                    item.getCourseCode(),
+                    item.getTitle(),
+                    item.getRoom()
+            });
+        }
     }
 
     private JComponent buildGradesPage() {
@@ -304,20 +351,83 @@ public class DashboardPanel extends JPanel {
 
     private JComponent buildTranscriptPage() {
         JPanel root = pageScaffold("Transcript");
-        JTextArea info = new JTextArea("Completed courses and grades.\n" +
-                "CSE101  Introduction to Programming   A\n" +
-                "MTH100  Calculus I                    B+\n" +
-                "\nExport options: CSV / PDF");
-        info.setEditable(false);
-        root.add(new JScrollPane(info), BorderLayout.CENTER);
+
+        JTextArea transcriptArea = new JTextArea();
+        transcriptArea.setEditable(false);
+        transcriptArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        transcriptArea.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        // 1. Fetch & Calculate Grades
+        java.util.List<edu.univ.erp.domain.StudentGradeView> grades = studentApi.getMyGrades();
+
+        // Helper map to aggregate scores: CourseCode -> FinalPercentage
+        java.util.Map<String, Double> courseTotals = new java.util.HashMap<>();
+        java.util.Map<String, String> courseTitles = new java.util.HashMap<>();
+
+        for (edu.univ.erp.domain.StudentGradeView g : grades) {
+            // Formula: (Score / Max) * Weight
+            double weightedScore = (g.getScore() / g.getMaxScore()) * g.getWeight();
+
+            courseTotals.put(g.getCourseCode(),
+                    courseTotals.getOrDefault(g.getCourseCode(), 0.0) + weightedScore
+            );
+            courseTitles.put(g.getCourseCode(), g.getCourseTitle());
+        }
+
+        // 2. Build Display Text
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("%-10s %-40s %s\n", "CODE", "TITLE", "GRADE"));
+        sb.append("------------------------------------------------------------\n");
+
+        for (String code : courseTotals.keySet()) {
+            double finalPct = courseTotals.get(code);
+            String letterGrade = getLetterGrade(finalPct);
+            sb.append(String.format("%-10s %-40s %.2f%% (%s)\n",
+                    code, courseTitles.get(code), finalPct, letterGrade));
+        }
+
+        transcriptArea.setText(sb.toString());
+
+        // 3. Export Button Logic
         JButton exportCsv = new JButton("Export CSV");
-        JButton exportPdf = new JButton("Export PDF");
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
-        actions.setOpaque(false);
-        actions.add(exportCsv);
-        actions.add(exportPdf);
-        root.add(actions, BorderLayout.SOUTH);
+        exportCsv.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Save Transcript");
+            fileChooser.setSelectedFile(new java.io.File("transcript.csv"));
+
+            if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                try (java.io.PrintWriter pw = new java.io.PrintWriter(fileChooser.getSelectedFile())) {
+                    pw.println("Code,Title,Percentage,Grade");
+                    for (String code : courseTotals.keySet()) {
+                        double finalPct = courseTotals.get(code);
+                        pw.printf("%s,%s,%.2f,%s%n",
+                                code, courseTitles.get(code), finalPct, getLetterGrade(finalPct));
+                    }
+                    JOptionPane.showMessageDialog(this, "Export Successful!");
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Error exporting file.");
+                    ex.printStackTrace();
+                }
+            }
+        });
+
+        root.add(new JScrollPane(transcriptArea), BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.setOpaque(false);
+        btnPanel.add(exportCsv);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
         return root;
+    }
+
+    // Helper for Letter Grades
+    private String getLetterGrade(double percentage) {
+        if (percentage >= 90) return "A";
+        if (percentage >= 80) return "B";
+        if (percentage >= 70) return "C";
+        if (percentage >= 60) return "D";
+        return "F";
     }
 
     private JComponent buildProfilePage() {
@@ -374,34 +484,31 @@ public class DashboardPanel extends JPanel {
      * Fetches fresh data from the API and rebuilds the "My Registrations" table.
      */
     private void refreshRegistrationsPage() {
-        // 1. Fetch data from the API
-        registrationItems = studentApi.getMyRegistrations(); // studentApi field already exists
+        registrationItems = studentApi.getMyRegistrations();
 
-        // 2. Define columns
-        String[] columnNames = {"Section", "Title", "Schedule", "Room", "Status"};
+        // UPDATED Columns: Added "Code" at the start
+        String[] columnNames = {"Code", "Section", "Title", "Schedule", "Room", "Status"};
 
-        // 3. Convert List to Object[][] for the JTable
-        Object[][] data = new Object[registrationItems.size()][5];
+        Object[][] data = new Object[registrationItems.size()][6];
         for (int i = 0; i < registrationItems.size(); i++) {
             RegistrationItem item = registrationItems.get(i);
-            data[i][0] = item.getSection();
-            data[i][1] = item.getTitle();
-            data[i][2] = item.getSchedule();
-            data[i][3] = item.getRoom();
-            data[i][4] = item.getStatus();
+            data[i][0] = item.getCourseCode(); // <--- Show Code
+            data[i][1] = item.getSection();
+            data[i][2] = item.getTitle();
+            data[i][3] = item.getSchedule();
+            data[i][4] = item.getRoom();
+            data[i][5] = item.getStatus();
         }
 
-        // 4. Create the table
+        // ... (Keep the rest of the table setup code: JTable creation, listener, scroll pane update) ...
         JTable table = new JTable(data, columnNames);
         table.setDefaultEditor(Object.class, null);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         decorateTable(table);
 
-        // 5. Add table listener to enable/disable the drop button
         table.getSelectionModel().addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting() && table.getSelectedRow() != -1) {
                 int modelRow = table.convertRowIndexToModel(table.getSelectedRow());
-                // Get the hidden sectionId from our stored List
                 selectedRegistrationSectionId = registrationItems.get(modelRow).getSectionId();
                 btnDrop.setEnabled(true);
             } else {
@@ -410,14 +517,11 @@ public class DashboardPanel extends JPanel {
             }
         });
 
-        // 6. Update the ScrollPane's view
         if (registrationsTableScrollPane == null) {
             registrationsTableScrollPane = new JScrollPane(table);
         } else {
             registrationsTableScrollPane.setViewportView(table);
         }
-
-        // Ensure button is disabled after refresh
         btnDrop.setEnabled(false);
     }
 }

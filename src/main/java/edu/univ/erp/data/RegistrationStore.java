@@ -17,16 +17,12 @@ public class RegistrationStore {
 
     /**
      * Fetches all registered sections for a specific student.
-     *
-     * @param studentId The user_id of the student from the session.
-     * @return A list of RegistrationItem objects.
      */
     public List<RegistrationItem> findRegistrationsByStudentId(int studentId) {
         List<RegistrationItem> registrations = new ArrayList<>();
 
-        // This query joins enrollments with sections and courses
-        // to get all the details needed for the UI table.
-        String query = "SELECT s.section_id, c.title, s.day_time, s.room, e.status " +
+        // UPDATED QUERY: Added c.code
+        String query = "SELECT s.section_id, c.code, c.title, s.day_time, s.room, e.status " +
                 "FROM enrollments e " +
                 "JOIN sections s ON e.section_id = s.section_id " +
                 "JOIN courses c ON s.course_id = c.code " +
@@ -39,13 +35,13 @@ public class RegistrationStore {
 
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    // v-- UPDATE THIS BLOCK
                     int sectionId = rs.getInt("section_id");
                     String sectionStr = "SEC-" + sectionId;
 
                     RegistrationItem item = new RegistrationItem(
-                            sectionId,  // The hidden ID
-                            sectionStr, // The display string
+                            sectionId,
+                            rs.getString("code"), // <--- Fetch Code
+                            sectionStr,
                             rs.getString("title"),
                             rs.getString("day_time"),
                             rs.getString("room"),
@@ -56,7 +52,6 @@ public class RegistrationStore {
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            // Handle exceptions
         }
         return registrations;
     }
@@ -167,8 +162,8 @@ public class RegistrationStore {
     public java.util.List<edu.univ.erp.domain.StudentGradeView> getGradesForStudent(int studentId) {
         java.util.List<edu.univ.erp.domain.StudentGradeView> grades = new java.util.ArrayList<>();
 
-        // Join scores -> assignments -> sections -> courses
-        String query = "SELECT c.code, ca.assignment_name, ss.score_obtained, ca.max_score " +
+        // Updated Query: Fetches Title and Weight
+        String query = "SELECT c.code, c.title, ca.assignment_name, ss.score_obtained, ca.max_score, ca.weight_percent " +
                 "FROM student_scores ss " +
                 "JOIN course_assignments ca ON ss.assignment_id = ca.assignment_id " +
                 "JOIN sections s ON ca.section_id = s.section_id " +
@@ -185,9 +180,11 @@ public class RegistrationStore {
                 while (rs.next()) {
                     grades.add(new edu.univ.erp.domain.StudentGradeView(
                             rs.getString("code"),
+                            rs.getString("title"), // <--- Title
                             rs.getString("assignment_name"),
                             rs.getDouble("score_obtained"),
-                            rs.getInt("max_score")
+                            rs.getInt("max_score"),
+                            rs.getInt("weight_percent") // <--- Weight
                     ));
                 }
             }
