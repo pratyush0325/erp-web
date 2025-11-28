@@ -48,4 +48,10 @@ public class UserSession {
     public String getUsername() { return username; }
     public String getRole() { return role; }
     public boolean isLoggedIn() { return loggedIn; }
+
+    public void setSession(int userId, String role, String username) {
+        this.userId = userId;
+        this.role = role;
+        this.username = username;
+    }
 }

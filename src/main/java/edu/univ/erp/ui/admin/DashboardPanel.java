@@ -679,17 +679,10 @@ public class DashboardPanel extends JPanel {
         content.add(pnlDate);
 
         // --- Instructions ---
-        JTextArea hint = new JTextArea(
-                "\nMaintenance Mode:\n" + "• Blocks all student/instructor changes.\n" + "• Useful during grade processing or updates.\n\n" + "Deadline:\n" + "• Students cannot Register or Drop after this date.\n" + "• Format must be exact (YYYY-MM-DD)."
-        );
-        hint.setEditable(false);
-        hint.setOpaque(false);
-        hint.setBorder(new EmptyBorder(20, 10, 10, 10));
-        hint.setForeground(Color.DARK_GRAY);
-        hint.setFont(new Font("SansSerif", Font.PLAIN, 13));
+
 
         root.add(content, BorderLayout.CENTER);
-        root.add(hint, BorderLayout.SOUTH);
+
         return root;
     }
 
