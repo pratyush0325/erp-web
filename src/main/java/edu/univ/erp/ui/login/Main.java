@@ -6,19 +6,17 @@ import javax.swing.SwingUtilities;
 public class Main extends JFrame {
 
     public Main() {
-        setTitle("University");
+        setTitle("University ERP");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
         PanelLogin loginPanel = new PanelLogin();
-        setLocationRelativeTo(null);
         add(loginPanel);
-//        setLayout(new GridBagLayout());
-//        GridBagConstraints gbc = new GridBagConstraints();
-//        gbc.gridx = 0;
-//        gbc.gridy = 0;
-//        gbc.anchor = GridBagConstraints.CENTER;
-//        add(loginPanel, gbc);
+
+        // 1. Calculate the size of the window based on components
         pack();
 
+        // 2. NOW center it (must be done after pack)
+        setLocationRelativeTo(null);
     }
 
     public static void main(String[] args) {

@@ -66,30 +66,57 @@ public class DashboardPanel extends JPanel {
     // ---------------------------------------------------------
     // 1. HOME / DASHBOARD
     // ---------------------------------------------------------
+    // ---------------------------------------------------------
+    // 1. HOME / DASHBOARD
+    // ---------------------------------------------------------
+    // ---------------------------------------------------------
+    // 1. HOME / DASHBOARD
+    // ---------------------------------------------------------
     private JComponent buildHome() {
         this.homePanel = scaffold("Admin Dashboard");
 
-        JPanel grid = new JPanel(new GridLayout(2, 2, 16, 16));
-        grid.setOpaque(false);
-
-        // ... (Keep existing StatCard logic) ...
-        Icon i1 = UIManager.getIcon("OptionPane.informationIcon");
-        Icon i2 = UIManager.getIcon("OptionPane.warningIcon");
-        Icon i3 = UIManager.getIcon("OptionPane.questionIcon");
-        Icon i4 = UIManager.getIcon("OptionPane.errorIcon");
+        // 1. Use FlowLayout (LEFT aligned) instead of GridLayout so cards don't stretch
+        JPanel cardsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 20));
+        cardsPanel.setOpaque(false);
 
         edu.univ.erp.domain.AdminStats stats = adminApi.getStats();
 
-        grid.add(new StatCard("Total Users", String.valueOf(stats.getTotalUsers()), "Admins + Instructors + Students", i1));
-        grid.add(new StatCard("Courses", String.valueOf(stats.getTotalCourses()), "Active courses", i2));
-        grid.add(new StatCard("Sections", String.valueOf(stats.getTotalSections()), "Scheduled classes", i3));
+        // Define a fixed size for cards (similar to Instructor dashboard)
+        Dimension cardSize = new Dimension(250, 140);
 
+        // Card 1: Total Users
+        StatCard card1 = new StatCard("Total Users", String.valueOf(stats.getTotalUsers()), "Admins + Instructors + Students", null);
+        card1.setBackground(new Color(0xE1F5FE)); // Light Blue
+        card1.setPreferredSize(cardSize);
+        cardsPanel.add(card1);
+
+        // Card 2: Courses
+        StatCard card2 = new StatCard("Courses", String.valueOf(stats.getTotalCourses()), "Active courses", null);
+        card2.setBackground(new Color(0xE8F5E9)); // Light Green
+        card2.setPreferredSize(cardSize);
+        cardsPanel.add(card2);
+
+        // Card 3: Sections
+        StatCard card3 = new StatCard("Sections", String.valueOf(stats.getTotalSections()), "Scheduled classes", null);
+        card3.setBackground(new Color(0xFFF3E0)); // Light Orange
+        card3.setPreferredSize(cardSize);
+        cardsPanel.add(card3);
+
+        // Card 4: Maintenance
         String maintStatus = stats.isMaintenanceOn() ? "ON" : "OFF";
-        grid.add(new StatCard("Maintenance", maintStatus, "System Status", i4));
+        StatCard card4 = new StatCard("Maintenance", maintStatus, "System Status", null);
+        card4.setBackground(new Color(0xFFEBEE)); // Light Red
+        card4.setPreferredSize(cardSize);
+        cardsPanel.add(card4);
 
-        this.homePanel.add(grid, BorderLayout.CENTER);
+        // 2. Wrap in a Container aligned to NORTH so they sit at the top
+        JPanel container = new JPanel(new BorderLayout());
+        container.setOpaque(false);
+        container.add(cardsPanel, BorderLayout.NORTH);
 
-        // --- NEW: Change Password Button ---
+        this.homePanel.add(container, BorderLayout.CENTER);
+
+        // --- Change Password Button ---
         JButton btnPass = new JButton("Change Password");
         btnPass.addActionListener(e -> showChangePasswordDialog());
 
@@ -97,7 +124,6 @@ public class DashboardPanel extends JPanel {
         btnPanel.setOpaque(false);
         btnPanel.add(btnPass);
         this.homePanel.add(btnPanel, BorderLayout.SOUTH);
-        // -----------------------------------
 
         return this.homePanel;
     }

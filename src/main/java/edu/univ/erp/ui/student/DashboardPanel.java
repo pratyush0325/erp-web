@@ -194,42 +194,46 @@ public class DashboardPanel extends JPanel {
     private JComponent buildCatalogPage() {
         JPanel root = pageScaffold("Course Catalog");
 
-        // 1. Define columns (we will NOT add section_id here)
-        String[] columnNames = {"Code", "Title", "Credits", "Instructor", "Capacity", "Sem", "Year"};
+        // 1. Update Columns: Added "ID" at the start
+        String[] columnNames = {"ID", "Code", "Title", "Credits", "Instructor", "Capacity", "Sem", "Year"};
 
-        // 2. Fetch data from the API
+        // 2. Fetch data
         CatalogApi catalogApi = new CatalogApi();
-        catalogItems = catalogApi.getCatalog(); // Store data in the class field
+        catalogItems = catalogApi.getCatalog();
 
-        // 3. Convert List to Object[][] for the JTable
-        Object[][] data = new Object[catalogItems.size()][7];
+        // 3. Populate Table
+        // Size increased to [8] to accommodate the new ID column
+        Object[][] data = new Object[catalogItems.size()][8];
+
         for (int i = 0; i < catalogItems.size(); i++) {
             CatalogItem item = catalogItems.get(i);
-            data[i][0] = item.getCode();
-            data[i][1] = item.getTitle();
-            data[i][2] = item.getCredits();
-            data[i][3] = item.getInstructorName();
-            data[i][4] = item.getCapacity();
-            data[i][5] = item.getSemester(); // <--- Show Sem
-            data[i][6] = item.getYear();     // <--- Show Year
+            data[i][0] = item.getSectionId(); // <--- Show Section ID
+            data[i][1] = item.getCode();
+            data[i][2] = item.getTitle();
+            data[i][3] = item.getCredits();
+            data[i][4] = item.getInstructorName();
+            data[i][5] = item.getCapacity();
+            data[i][6] = item.getSemester();
+            data[i][7] = item.getYear();
         }
 
-        // 4. Create the table
         JTable table = new JTable(data, columnNames);
         table.setDefaultEditor(Object.class, null);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        // Optional: Set the ID column width to be small
+        table.getColumnModel().getColumn(0).setPreferredWidth(40);
+        table.getColumnModel().getColumn(0).setMaxWidth(60);
+
         decorateTable(table);
 
-        // 5. Create the "Register" button
+        // ... (Keep existing button logic) ...
         btnRegister = new JButton("Register for Selected Course");
-        btnRegister.setEnabled(false); // Disabled by default
+        btnRegister.setEnabled(false);
 
-        // 6. Add a listener to the table to enable/disable the button
         table.getSelectionModel().addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting() && table.getSelectedRow() != -1) {
-                // A row is selected
                 int modelRow = table.convertRowIndexToModel(table.getSelectedRow());
-                // Get the hidden sectionId from our stored List
                 selectedSectionId = catalogItems.get(modelRow).getSectionId();
                 btnRegister.setEnabled(true);
             } else {
@@ -238,14 +242,11 @@ public class DashboardPanel extends JPanel {
             }
         });
 
-        // 7. Add the button's action listener (calls the API)
+        // ... (Keep existing Register button listener) ...
         btnRegister.addActionListener(e -> {
             if (selectedSectionId == -1) return;
 
-            // Call the API we built!
             RegistrationStatus status = studentApi.registerForSection(selectedSectionId);
-
-            // Show a friendly message
             String message = "";
             int messageType = JOptionPane.INFORMATION_MESSAGE;
 
@@ -254,7 +255,7 @@ public class DashboardPanel extends JPanel {
                     message = "System is under maintenance. Registration is disabled.";
                     messageType = JOptionPane.WARNING_MESSAGE;
                     break;
-                case DEADLINE_PASSED: // <--- NEW
+                case DEADLINE_PASSED:
                     message = "Registration is closed. The deadline has passed.";
                     messageType = JOptionPane.ERROR_MESSAGE;
                     break;
@@ -279,7 +280,6 @@ public class DashboardPanel extends JPanel {
             JOptionPane.showMessageDialog(root, message, "Registration Status", messageType);
         });
 
-        // 8. Add components to the panel
         root.add(new JScrollPane(table), BorderLayout.CENTER);
         root.add(btnRegister, BorderLayout.SOUTH);
         return root;
