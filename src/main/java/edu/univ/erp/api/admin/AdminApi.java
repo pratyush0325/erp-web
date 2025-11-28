@@ -8,6 +8,8 @@ public class AdminApi {
 
     private final AdminStore adminStore = new AdminStore();
     private final edu.univ.erp.data.SettingsStore settingsStore = new edu.univ.erp.data.SettingsStore();
+    private final edu.univ.erp.data.BackupManager backupManager = new edu.univ.erp.data.BackupManager();
+
 
     public List<UserAdminItem> getUsers() {
         return adminStore.getAllUsers();
@@ -80,5 +82,12 @@ public class AdminApi {
     public boolean toggleUserStatus(int userId, String currentStatus) {
         String newStatus = "Active".equalsIgnoreCase(currentStatus) ? "Inactive" : "Active";
         return adminStore.updateUserStatus(userId, newStatus);
+    }
+    public boolean triggerBackup(java.io.File file) {
+        return backupManager.backup(file);
+    }
+
+    public boolean triggerRestore(java.io.File file) {
+        return backupManager.restore(file);
     }
 }

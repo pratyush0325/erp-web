@@ -629,40 +629,33 @@ public class DashboardPanel extends JPanel {
         content.setOpaque(false);
         content.setBorder(new EmptyBorder(20, 0, 0, 0));
 
-        // --- 1. Maintenance Mode Toggle ---
+        // --- 1. Maintenance Mode ---
         JPanel pnlMaint = new JPanel(new FlowLayout(FlowLayout.LEFT));
         pnlMaint.setOpaque(false);
-
         JCheckBox toggle = new JCheckBox("Enable Maintenance Mode");
         toggle.setFont(new Font("Raleway", Font.BOLD, 16));
         toggle.setOpaque(false);
         toggle.setSelected(adminApi.isMaintenanceOn());
-
         toggle.addActionListener(e -> {
             boolean isSelected = toggle.isSelected();
             adminApi.setMaintenance(isSelected);
             String status = isSelected ? "ON" : "OFF";
             JOptionPane.showMessageDialog(this, "Maintenance Mode is now " + status);
         });
-
         pnlMaint.add(toggle);
         content.add(pnlMaint);
 
         // --- 2. Registration Deadline ---
         JPanel pnlDate = new JPanel(new FlowLayout(FlowLayout.LEFT));
         pnlDate.setOpaque(false);
-
         JLabel lblDate = new JLabel("Registration Deadline (YYYY-MM-DD): ");
         lblDate.setFont(new Font("Raleway", Font.PLAIN, 14));
-
         JTextField txtDate = new JTextField(12);
         txtDate.setFont(new Font("Monospaced", Font.PLAIN, 14));
-        txtDate.setText(adminApi.getDeadline()); // Load current value
-
+        txtDate.setText(adminApi.getDeadline());
         JButton btnSaveDate = new JButton("Update Deadline");
         btnSaveDate.addActionListener(e -> {
             String input = txtDate.getText().trim();
-            // Simple validation regex for YYYY-MM-DD
             if (input.matches("\\d{4}-\\d{2}-\\d{2}")) {
                 adminApi.setDeadline(input);
                 JOptionPane.showMessageDialog(this, "Deadline updated to " + input);
@@ -670,20 +663,83 @@ public class DashboardPanel extends JPanel {
                 JOptionPane.showMessageDialog(this, "Invalid format. Use YYYY-MM-DD.", "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
-
-        pnlDate.add(lblDate);
-        pnlDate.add(txtDate);
-        pnlDate.add(btnSaveDate);
-
-        content.add(Box.createVerticalStrut(20)); // Spacer
+        pnlDate.add(lblDate); pnlDate.add(txtDate); pnlDate.add(btnSaveDate);
         content.add(pnlDate);
 
-        // --- Instructions ---
+        // --- 3. Backup & Restore (NEW) ---
+        JPanel pnlBackup = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        pnlBackup.setOpaque(false);
+        pnlBackup.setBorder(new EmptyBorder(20, 0, 0, 0));
 
+        JLabel lblBackup = new JLabel("Database Management: ");
+        lblBackup.setFont(new Font("Raleway", Font.BOLD, 14));
+
+        JButton btnBackup = new JButton("Backup Data");
+        btnBackup.setBackground(new Color(0xE3F2FD)); // Light Blue
+        btnBackup.addActionListener(e -> performBackup());
+
+        JButton btnRestore = new JButton("Restore Data");
+        btnRestore.setBackground(new Color(0xFFEBEE)); // Light Red
+        btnRestore.addActionListener(e -> performRestore());
+
+        pnlBackup.add(lblBackup);
+        pnlBackup.add(btnBackup);
+        pnlBackup.add(btnRestore);
+        content.add(pnlBackup);
 
         root.add(content, BorderLayout.CENTER);
-
         return root;
+    }
+
+    // --- Helper for Backup ---
+    private void performBackup() {
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Save Backup SQL");
+        fc.setSelectedFile(new java.io.File("university_backup.sql"));
+
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            // Use SwingWorker to prevent UI freeze
+            new SwingWorker<Boolean, Void>() {
+                @Override protected Boolean doInBackground() {
+                    return adminApi.triggerBackup(fc.getSelectedFile());
+                }
+                @Override protected void done() {
+                    try {
+                        if (get()) JOptionPane.showMessageDialog(DashboardPanel.this, "Backup Successful!");
+                        else JOptionPane.showMessageDialog(DashboardPanel.this, "Backup Failed.\nCheck if 'mysqldump' is in your System PATH.", "Error", JOptionPane.ERROR_MESSAGE);
+                    } catch (Exception ex) { ex.printStackTrace(); }
+                }
+            }.execute();
+        }
+    }
+
+    // --- Helper for Restore ---
+    private void performRestore() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Restoring will OVERWRITE current data with the backup file.\nAre you sure?",
+                "Confirm Restore", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Select Backup File to Restore");
+
+        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            new SwingWorker<Boolean, Void>() {
+                @Override protected Boolean doInBackground() {
+                    return adminApi.triggerRestore(fc.getSelectedFile());
+                }
+                @Override protected void done() {
+                    try {
+                        if (get()) {
+                            JOptionPane.showMessageDialog(DashboardPanel.this, "Restore Successful! Please restart the app.");
+                            System.exit(0); // Restart is best practice after DB restore
+                        }
+                        else JOptionPane.showMessageDialog(DashboardPanel.this, "Restore Failed.\nCheck if 'mysql' is in your System PATH.", "Error", JOptionPane.ERROR_MESSAGE);
+                    } catch (Exception ex) { ex.printStackTrace(); }
+                }
+            }.execute();
+        }
     }
 
     // ---------------------------------------------------------
