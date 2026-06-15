@@ -1,72 +1,55 @@
 package edu.univ.erp.api.student;
 
-import edu.univ.erp.auth.session.UserSession;
+import edu.univ.erp.data.ProfileStore;
 import edu.univ.erp.data.RegistrationStore;
+import edu.univ.erp.data.SettingsStore;
 import edu.univ.erp.domain.RegistrationItem;
+import edu.univ.erp.domain.StudentGradeView;
+import edu.univ.erp.domain.StudentProfile;
+import edu.univ.erp.service.StudentService;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
 import java.util.List;
 
-import edu.univ.erp.api.student.RegistrationStatus;
-import edu.univ.erp.service.StudentService;
-import edu.univ.erp.api.student.DropStatus;
-
+@Service
 public class StudentApi {
 
-    private final RegistrationStore registrationStore = new RegistrationStore();
-    private final edu.univ.erp.data.ProfileStore profileStore = new edu.univ.erp.data.ProfileStore();
-    private final edu.univ.erp.data.SettingsStore settingsStore = new edu.univ.erp.data.SettingsStore();
+    private final RegistrationStore registrationStore;
+    private final ProfileStore profileStore;
+    private final SettingsStore settingsStore;
+    private final StudentService studentService;
 
-    /**
-     * Gets the list of registered courses for the *currently logged-in* student.
-     *
-     * @return A list of RegistrationItem objects.
-     */
-    public List<RegistrationItem> getMyRegistrations() {
-        // Get the logged-in user's ID from the session
-        int currentStudentId = UserSession.getInstance().getUserId();
-
-        // Use the ID to fetch their registrations
-        return registrationStore.findRegistrationsByStudentId(currentStudentId);
+    public StudentApi(RegistrationStore registrationStore, ProfileStore profileStore,
+                      SettingsStore settingsStore, StudentService studentService) {
+        this.registrationStore = registrationStore;
+        this.profileStore = profileStore;
+        this.settingsStore = settingsStore;
+        this.studentService = studentService;
     }
 
-    private final StudentService studentService = new StudentService();
-
-    /**
-     * Attempts to register the current student for a section.
-     * @param sectionId The ID of the section to register for.
-     * @return A RegistrationStatus enum indicating the outcome.
-     */
-    public RegistrationStatus registerForSection(int sectionId) {
-        // Get the logged-in user's ID
-        int currentStudentId = UserSession.getInstance().getUserId();
-
-        // Call the "brain" to perform the logic
-        return studentService.registerStudent(currentStudentId, sectionId);
+    public List<RegistrationItem> getMyRegistrations(int userId) {
+        return registrationStore.findRegistrationsByStudentId(userId);
     }
 
-    /**
-     * Attempts to drop the current student from a section.
-     * @param sectionId The ID of the section to drop.
-     * @return A DropStatus enum indicating the outcome.
-     */
-    public DropStatus dropSection(int sectionId) {
-        int currentStudentId = UserSession.getInstance().getUserId();
-
-        // Call the "brain" to perform the logic
-        return studentService.dropStudent(currentStudentId, sectionId);
+    public RegistrationStatus registerForSection(int userId, int sectionId) {
+        return studentService.registerStudent(userId, sectionId);
     }
 
-    public java.util.List<edu.univ.erp.domain.StudentGradeView> getMyGrades() {
-        int studentId = edu.univ.erp.auth.session.UserSession.getInstance().getUserId();
-        return registrationStore.getGradesForStudent(studentId);
+    public DropStatus dropSection(int userId, int sectionId) {
+        return studentService.dropStudent(userId, sectionId);
     }
 
-    public edu.univ.erp.domain.StudentProfile getProfile() {
-        int studentId = UserSession.getInstance().getUserId();
-        return profileStore.getStudentProfile(studentId);
+    public List<StudentGradeView> getMyGrades(int userId) {
+        return registrationStore.getGradesForStudent(userId);
+    }
+
+    public StudentProfile getProfile(int userId) {
+        return profileStore.getStudentProfile(userId);
     }
 
     public String getDeadline() {
-        java.time.LocalDate date = settingsStore.getRegistrationDeadline();
+        LocalDate date = settingsStore.getRegistrationDeadline();
         return (date != null) ? date.toString() : "None";
     }
 }

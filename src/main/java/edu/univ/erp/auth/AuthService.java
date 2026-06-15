@@ -4,17 +4,17 @@ import edu.univ.erp.api.auth.LoginResult;
 import edu.univ.erp.api.auth.LoginStatus;
 import edu.univ.erp.auth.store.AuthStore;
 import org.mindrot.jbcrypt.BCrypt;
+import org.springframework.stereotype.Service;
 
+@Service
 public class AuthService {
 
-    private final AuthStore authStore = new AuthStore();
+    private final AuthStore authStore;
 
-    /**
-     * Attempts to log in a user.
-     * @param username The username.
-     * @param password The plain-text password.
-     * @return A LoginResult object with the outcome.
-     */
+    public AuthService(AuthStore authStore) {
+        this.authStore = authStore;
+    }
+
     public LoginResult login(String username, String password) {
         UserAuth user = authStore.findUserByUsername(username);
 
@@ -22,63 +22,36 @@ public class AuthService {
             return new LoginResult(LoginStatus.USER_NOT_FOUND, null, 0);
         }
 
-        // --- NEW: Check Status ---
         if (!"Active".equalsIgnoreCase(user.getStatus())) {
             return new LoginResult(LoginStatus.ACCOUNT_INACTIVE, null, 0);
         }
 
-        // 1. CHECK LOCKOUT STATUS
         if (user.getLockoutUntil() != null) {
             long now = System.currentTimeMillis();
-            long unlockTime = user.getLockoutUntil().getTime();
-
-            if (now < unlockTime) {
-                // Still locked
+            if (now < user.getLockoutUntil().getTime()) {
                 return new LoginResult(LoginStatus.ACCOUNT_LOCKED, null, 0);
             }
-            // Lock expired -> Proceed (the DB will reset attempts on next success, or increment on fail)
         }
 
-        // 2. CHECK PASSWORD
         if (BCrypt.checkpw(password, user.getPasswordHash())) {
-            // SUCCESS: Reset bad attempts counter
             authStore.resetFailedAttempts(user.getUserId());
             return new LoginResult(LoginStatus.SUCCESS, user.getRole(), user.getUserId());
         } else {
-            // FAILURE: Increment counter
             authStore.incrementFailedAttempts(user.getUserId());
-
-            // Calculate attempts
-            int currentFailures = user.getFailedAttempts() + 1; // +1 because we just incremented it
-            int maxAttempts = 5;
-            int remaining = maxAttempts - currentFailures;
-
-            // Check if they hit the limit
-            if (currentFailures >= maxAttempts) {
-                // Lock for 30 seconds
+            int currentFailures = user.getFailedAttempts() + 1;
+            int remaining = 5 - currentFailures;
+            if (currentFailures >= 5) {
                 authStore.lockAccount(user.getUserId(), 5);
                 return new LoginResult(LoginStatus.ACCOUNT_LOCKED, null, 0);
             }
-
-            // Return INVALID_PASSWORD with the remaining count
             return new LoginResult(LoginStatus.INVALID_PASSWORD, null, 0, remaining);
         }
     }
 
-    // ... existing code ...
-
     public boolean changePassword(int userId, String currentPassword, String newPassword) {
-        // 1. Fetch current user data
         UserAuth user = authStore.findUserById(userId);
         if (user == null) return false;
-
-        // 2. Verify the CURRENT password
-        if (!BCrypt.checkpw(currentPassword, user.getPasswordHash())) {
-            return false; // Wrong password provided
-        }
-
-        // 3. Hash the NEW password and update
-        String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-        return authStore.updatePassword(userId, newHash);
+        if (!BCrypt.checkpw(currentPassword, user.getPasswordHash())) return false;
+        return authStore.updatePassword(userId, BCrypt.hashpw(newPassword, BCrypt.gensalt()));
     }
 }

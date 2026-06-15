@@ -1,181 +1,130 @@
 package edu.univ.erp.data;
 
 import edu.univ.erp.domain.RegistrationItem;
+import edu.univ.erp.domain.StudentGradeView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Repository;
+
+import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+@Repository
 public class RegistrationStore {
 
-    private String dbUrl = "jdbc:mysql://localhost:3306/erp_db";
-    private String dbUser = "root";
-    private String dbPassword = "prabhi12";
+    private static final Logger log = LoggerFactory.getLogger(RegistrationStore.class);
 
-    /**
-     * Fetches all registered sections for a specific student.
-     */
+    private final DataSource dataSource;
+
+    public RegistrationStore(@Qualifier("erpDataSource") DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
     public List<RegistrationItem> findRegistrationsByStudentId(int studentId) {
         List<RegistrationItem> registrations = new ArrayList<>();
-
-        // UPDATED QUERY: Added c.code
         String query = "SELECT s.section_id, c.code, c.title, s.day_time, s.room, e.status " +
                 "FROM enrollments e " +
                 "JOIN sections s ON e.section_id = s.section_id " +
                 "JOIN courses c ON s.course_id = c.code " +
                 "WHERE e.student_id = ?";
-
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+        try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
-
             stmt.setInt(1, studentId);
-
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     int sectionId = rs.getInt("section_id");
-                    String sectionStr = "SEC-" + sectionId;
-
-                    RegistrationItem item = new RegistrationItem(
-                            sectionId,
-                            rs.getString("code"), // <--- Fetch Code
-                            sectionStr,
-                            rs.getString("title"),
-                            rs.getString("day_time"),
-                            rs.getString("room"),
-                            rs.getString("status")
-                    );
-                    registrations.add(item);
+                    registrations.add(new RegistrationItem(
+                            sectionId, rs.getString("code"), "SEC-" + sectionId,
+                            rs.getString("title"), rs.getString("day_time"),
+                            rs.getString("room"), rs.getString("status")));
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            log.error("Failed to fetch registrations for studentId={}", studentId, e);
         }
         return registrations;
     }
 
-    /**
-     * Checks if a student is already enrolled in a specific section.
-     * @return true if an enrollment record exists, false otherwise.
-     */
-    /**
-     * Checks if a student is already enrolled in ANY section of this COURSE.
-     * Prevents registering for duplicate sections (e.g., Section A and Section B of CS101).
-     */
     public boolean isAlreadyRegistered(int studentId, int sectionId) {
-        // UPDATED QUERY:
-        // 1. Find the course_id of the target section (subquery).
-        // 2. Check if the student has an enrollment in any section with that course_id.
-        String query = "SELECT 1 " +
-                "FROM enrollments e " +
+        String query = "SELECT 1 FROM enrollments e " +
                 "JOIN sections s ON e.section_id = s.section_id " +
                 "WHERE e.student_id = ? " +
                 "AND s.course_id = (SELECT course_id FROM sections WHERE section_id = ?)";
-
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+        try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
-
             stmt.setInt(1, studentId);
             stmt.setInt(2, sectionId);
-
             try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next(); // If true, they are already taking this course!
+                return rs.next();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
-            return true; // Fail-safe
+            log.error("Failed to check registration for student={} section={}", studentId, sectionId, e);
+            return true; // fail-safe
         }
     }
 
-    /**
-     * Gets the current number of enrolled students for a section.
-     */
     public int getSectionEnrollmentCount(int sectionId) {
         String query = "SELECT COUNT(*) FROM enrollments WHERE section_id = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+        try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
-
             stmt.setInt(1, sectionId);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
-                }
+                if (rs.next()) return rs.getInt(1);
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            log.error("Failed to count enrollments for sectionId={}", sectionId, e);
         }
         return 0;
     }
 
-    /**
-     * Gets the total capacity for a specific section.
-     */
     public int getSectionCapacity(int sectionId) {
         String query = "SELECT capacity FROM sections WHERE section_id = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+        try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
-
             stmt.setInt(1, sectionId);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("capacity");
-                }
+                if (rs.next()) return rs.getInt("capacity");
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            log.error("Failed to fetch capacity for sectionId={}", sectionId, e);
         }
-        return 0; // Default to 0 if not found
+        return 0;
     }
 
-    /**
-     * Inserts a new enrollment record into the database.
-     * @return true if the insert was successful, false otherwise.
-     */
     public boolean createEnrollment(int studentId, int sectionId) {
         String query = "INSERT INTO enrollments (student_id, section_id, status) VALUES (?, ?, 'registered')";
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+        try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
-
             stmt.setInt(1, studentId);
             stmt.setInt(2, sectionId);
-            int rowsAffected = stmt.executeUpdate();
-            return rowsAffected > 0;
+            return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            e.printStackTrace();
+            log.error("Failed to create enrollment for student={} section={}", studentId, sectionId, e);
             return false;
         }
     }
 
-    /**
-     * Deletes an enrollment record from the database.
-     * @return true if the delete was successful, false otherwise.
-     */
     public boolean deleteEnrollment(int studentId, int sectionId) {
-        // We check for studentId AND sectionId to ensure
-        // students can only drop their own courses.
         String query = "DELETE FROM enrollments WHERE student_id = ? AND section_id = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+        try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
-
             stmt.setInt(1, studentId);
             stmt.setInt(2, sectionId);
-            int rowsAffected = stmt.executeUpdate();
-            return rowsAffected > 0; // Will be false if the record didn't exist
+            return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            e.printStackTrace();
+            log.error("Failed to delete enrollment for student={} section={}", studentId, sectionId, e);
             return false;
         }
     }
 
-    /**
-     * Fetches all component grades (Quizzes, Exams) for the student.
-     */
-    public java.util.List<edu.univ.erp.domain.StudentGradeView> getGradesForStudent(int studentId) {
-        java.util.List<edu.univ.erp.domain.StudentGradeView> grades = new java.util.ArrayList<>();
-
-        // Updated Query: Fetches Title and Weight
+    public List<StudentGradeView> getGradesForStudent(int studentId) {
+        List<StudentGradeView> grades = new ArrayList<>();
         String query = "SELECT c.code, c.title, ca.assignment_name, ss.score_obtained, ca.max_score, ca.weight_percent " +
                 "FROM student_scores ss " +
                 "JOIN course_assignments ca ON ss.assignment_id = ca.assignment_id " +
@@ -183,26 +132,19 @@ public class RegistrationStore {
                 "JOIN courses c ON s.course_id = c.code " +
                 "WHERE ss.student_id = ? " +
                 "ORDER BY c.code, ca.assignment_name";
-
-        try (java.sql.Connection conn = java.sql.DriverManager.getConnection(dbUrl, dbUser, dbPassword);
-             java.sql.PreparedStatement stmt = conn.prepareStatement(query)) {
-
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setInt(1, studentId);
-
-            try (java.sql.ResultSet rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    grades.add(new edu.univ.erp.domain.StudentGradeView(
-                            rs.getString("code"),
-                            rs.getString("title"), // <--- Title
-                            rs.getString("assignment_name"),
-                            rs.getDouble("score_obtained"),
-                            rs.getInt("max_score"),
-                            rs.getInt("weight_percent") // <--- Weight
-                    ));
+                    grades.add(new StudentGradeView(
+                            rs.getString("code"), rs.getString("title"),
+                            rs.getString("assignment_name"), rs.getDouble("score_obtained"),
+                            rs.getInt("max_score"), rs.getInt("weight_percent")));
                 }
             }
-        } catch (java.sql.SQLException e) {
-            e.printStackTrace();
+        } catch (SQLException e) {
+            log.error("Failed to fetch grades for studentId={}", studentId, e);
         }
         return grades;
     }

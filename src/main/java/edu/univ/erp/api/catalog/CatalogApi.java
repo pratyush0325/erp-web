@@ -2,20 +2,20 @@ package edu.univ.erp.api.catalog;
 
 import edu.univ.erp.data.CatalogStore;
 import edu.univ.erp.domain.CatalogItem;
+import org.springframework.stereotype.Service;
+
 import java.util.List;
 
+@Service
 public class CatalogApi {
 
-    private final CatalogStore catalogStore = new CatalogStore();
+    private final CatalogStore catalogStore;
 
-    /**
-     * Gets the full list of catalog items for the UI.
-     *
-     * @return A list of CatalogItem objects.
-     */
+    public CatalogApi(CatalogStore catalogStore) {
+        this.catalogStore = catalogStore;
+    }
+
     public List<CatalogItem> getCatalog() {
-        // For now, this is a simple pass-through.
-        // Later, this is where you could add caching or other logic.
         return catalogStore.getCatalogItems();
     }
 }
