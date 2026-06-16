@@ -49,7 +49,7 @@ jobs:
           ssh -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
               ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
-              "sudo mkdir -p /srv/erp /srv/erp-web/dist /etc/caddy/conf.d && \
+              "sudo mkdir -p /srv/erp /srv/erp-web/dist && \
                sudo chown -R ${{ secrets.AZURE_USER }}:${{ secrets.AZURE_USER }} /srv/erp /srv/erp-web"
 
       - name: Copy jar
@@ -79,16 +79,16 @@ jobs:
                sudo systemctl daemon-reload && \
                sudo systemctl enable erp"
 
-      - name: Update Caddy site config
+      - name: Update Caddyfile
         run: |
           scp -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
-              deploy/erp.caddy \
-              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:~/erp.caddy
+              deploy/Caddyfile \
+              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:~/Caddyfile
           ssh -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
               ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
-              "sudo mv ~/erp.caddy /etc/caddy/conf.d/erp.caddy && \
+              "sudo mv ~/Caddyfile /etc/caddy/Caddyfile && \
                sudo systemctl reload caddy"
 
       - name: Restart Spring Boot
