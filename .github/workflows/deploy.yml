@@ -50,7 +50,7 @@ jobs:
               -o StrictHostKeyChecking=no \
               ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
               "sudo mkdir -p /srv/erp /srv/erp-web/dist /etc/caddy/conf.d && \
-               sudo chown ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} /srv/erp /srv/erp-web"
+               sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} /srv/erp /srv/erp-web"
 
       - name: Copy jar
         run: |
