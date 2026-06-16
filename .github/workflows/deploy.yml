@@ -38,43 +38,43 @@ jobs:
           npm ci
           npm run build
 
-      # ── 4. Deploy to EC2 ───────────────────────────────────
+      # ── 4. Deploy to Azure VM ─────────────────────────────
       - name: Write SSH key
         run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/deploy_key
+          echo "${{ secrets.AZURE_SSH_KEY }}" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
 
       - name: Ensure server directories exist
         run: |
           ssh -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
-              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
               "sudo mkdir -p /srv/erp /srv/erp-web/dist /etc/caddy/conf.d && \
-               sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} /srv/erp /srv/erp-web"
+               sudo chown -R ${{ secrets.AZURE_USER }}:${{ secrets.AZURE_USER }} /srv/erp /srv/erp-web"
 
       - name: Copy jar
         run: |
           scp -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
               target/Uni-1.0-SNAPSHOT.jar \
-              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/srv/erp/app.jar
+              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:/srv/erp/app.jar
 
       - name: Copy frontend
         run: |
           scp -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no -r \
               erp-web/dist/ \
-              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/srv/erp-web/dist/
+              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:/srv/erp-web/dist/
 
       - name: Install / update systemd service
         run: |
           scp -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
               deploy/erp.service \
-              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/erp.service
+              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:~/erp.service
           ssh -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
-              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
               "sudo mv ~/erp.service /etc/systemd/system/erp.service && \
                sudo systemctl daemon-reload && \
                sudo systemctl enable erp"
@@ -84,10 +84,10 @@ jobs:
           scp -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
               deploy/erp.caddy \
-              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/erp.caddy
+              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:~/erp.caddy
           ssh -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
-              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
               "sudo mv ~/erp.caddy /etc/caddy/conf.d/erp.caddy && \
                sudo systemctl reload caddy"
 
@@ -95,7 +95,7 @@ jobs:
         run: |
           ssh -i /tmp/deploy_key \
               -o StrictHostKeyChecking=no \
-              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
               "sudo systemctl restart erp && sudo systemctl is-active --quiet erp && echo 'erp is running'"
 
       - name: Clean up SSH key
