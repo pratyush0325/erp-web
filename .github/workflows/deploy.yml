@@ -1,0 +1,103 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Build backend ───────────────────────────────────
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build Spring Boot jar
+        run: mvn package -DskipTests
+
+      # ── 3. Build frontend ──────────────────────────────────
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: erp-web/package-lock.json
+
+      - name: Build React app
+        run: |
+          cd erp-web
+          npm ci
+          npm run build
+
+      # ── 4. Deploy to EC2 ───────────────────────────────────
+      - name: Write SSH key
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+      - name: Ensure server directories exist
+        run: |
+          ssh -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "sudo mkdir -p /srv/erp /srv/erp-web/dist /etc/caddy/conf.d && \
+               sudo chown ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} /srv/erp /srv/erp-web"
+
+      - name: Copy jar
+        run: |
+          scp -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              target/Uni-1.0-SNAPSHOT.jar \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/srv/erp/app.jar
+
+      - name: Copy frontend
+        run: |
+          scp -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no -r \
+              erp-web/dist/ \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/srv/erp-web/dist/
+
+      - name: Install / update systemd service
+        run: |
+          scp -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              deploy/erp.service \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/erp.service
+          ssh -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "sudo mv ~/erp.service /etc/systemd/system/erp.service && \
+               sudo systemctl daemon-reload && \
+               sudo systemctl enable erp"
+
+      - name: Update Caddy site config
+        run: |
+          scp -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              deploy/erp.caddy \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/erp.caddy
+          ssh -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "sudo mv ~/erp.caddy /etc/caddy/conf.d/erp.caddy && \
+               sudo systemctl reload caddy"
+
+      - name: Restart Spring Boot
+        run: |
+          ssh -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "sudo systemctl restart erp && sudo systemctl is-active --quiet erp && echo 'erp is running'"
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f /tmp/deploy_key

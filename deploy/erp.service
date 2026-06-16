@@ -3,7 +3,7 @@ Description=ERP Spring Boot Application
 After=network.target mysql.service
 
 [Service]
-User=ec2-user
+User=ubuntu
 WorkingDirectory=/srv/erp
 ExecStart=/usr/bin/java -jar /srv/erp/app.jar
 EnvironmentFile=/srv/erp/.env

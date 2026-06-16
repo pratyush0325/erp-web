@@ -1,0 +1,21 @@
+erp.pratyushgupta.dev {
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+    }
+
+    # API → Spring Boot on port 8082
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8082
+    }
+
+    # Everything else → React SPA
+    handle {
+        root * /srv/erp-web/dist
+        try_files {path} /index.html
+        file_server
+    }
+}
