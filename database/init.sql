@@ -11,12 +11,14 @@ USE auth_db;
 DROP TABLE IF EXISTS users_auth;
 
 CREATE TABLE users_auth (
-    user_id       INT          PRIMARY KEY AUTO_INCREMENT,
-    username      VARCHAR(50)  NOT NULL UNIQUE,
-    role          VARCHAR(20)  NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    status        VARCHAR(20)  DEFAULT 'active',
-    last_login    TIMESTAMP    NULL
+    user_id        INT          PRIMARY KEY AUTO_INCREMENT,
+    username       VARCHAR(50)  NOT NULL UNIQUE,
+    role           VARCHAR(20)  NOT NULL,
+    password_hash  VARCHAR(255) NOT NULL,
+    status         VARCHAR(20)  DEFAULT 'active',
+    failed_attempts INT         NOT NULL DEFAULT 0,
+    lockout_until  TIMESTAMP    NULL,
+    last_login     TIMESTAMP    NULL
 );
 
 -- password for all accounts: demo123
