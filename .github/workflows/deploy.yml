@@ -39,65 +39,65 @@ jobs:
           npm run build
 
       # ── 4. Deploy to Azure VM ─────────────────────────────
-      - name: Write SSH key
-        run: |
-          echo "${{ secrets.AZURE_SSH_KEY }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
       - name: Ensure server directories exist
-        run: |
-          ssh -i /tmp/deploy_key \
-              -o StrictHostKeyChecking=no \
-              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
-              "sudo mkdir -p /srv/erp /srv/erp-web/dist && \
-               sudo chown -R ${{ secrets.AZURE_USER }}:${{ secrets.AZURE_USER }} /srv/erp /srv/erp-web"
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          script: |
+            sudo mkdir -p /srv/erp /srv/erp-web/dist
+            sudo chown -R $USER:$USER /srv/erp /srv/erp-web
 
-      - name: Copy jar
-        run: |
-          scp -i /tmp/deploy_key \
-              -o StrictHostKeyChecking=no \
-              target/Uni-1.0-SNAPSHOT.jar \
-              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:/srv/erp/app.jar
+      - name: Copy backend jar
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          source: "target/Uni-1.0-SNAPSHOT.jar"
+          target: "/srv/erp"
+          strip_components: 1
+
+      - name: Rename jar
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          script: mv /srv/erp/Uni-1.0-SNAPSHOT.jar /srv/erp/app.jar
 
       - name: Copy frontend
-        run: |
-          scp -i /tmp/deploy_key \
-              -o StrictHostKeyChecking=no -r \
-              erp-web/dist/ \
-              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:/srv/erp-web/dist/
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          source: "erp-web/dist/*"
+          target: "/srv/erp-web/dist"
+          strip_components: 2
 
-      - name: Install / update systemd service
-        run: |
-          scp -i /tmp/deploy_key \
-              -o StrictHostKeyChecking=no \
-              deploy/erp.service \
-              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:~/erp.service
-          ssh -i /tmp/deploy_key \
-              -o StrictHostKeyChecking=no \
-              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
-              "sudo mv ~/erp.service /etc/systemd/system/erp.service && \
-               sudo systemctl daemon-reload && \
-               sudo systemctl enable erp"
+      - name: Copy systemd service and Caddyfile
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          source: "deploy/erp.service,deploy/Caddyfile"
+          target: "/tmp"
+          strip_components: 1
 
-      - name: Update Caddyfile
-        run: |
-          scp -i /tmp/deploy_key \
-              -o StrictHostKeyChecking=no \
-              deploy/Caddyfile \
-              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:~/Caddyfile
-          ssh -i /tmp/deploy_key \
-              -o StrictHostKeyChecking=no \
-              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
-              "sudo mv ~/Caddyfile /etc/caddy/Caddyfile && \
-               sudo systemctl reload caddy"
-
-      - name: Restart Spring Boot
-        run: |
-          ssh -i /tmp/deploy_key \
-              -o StrictHostKeyChecking=no \
-              ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
-              "sudo systemctl restart erp && sudo systemctl is-active --quiet erp && echo 'erp is running'"
-
-      - name: Clean up SSH key
-        if: always()
-        run: rm -f /tmp/deploy_key
+      - name: Install configs and restart services
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          script: |
+            sudo mv /tmp/erp.service /etc/systemd/system/erp.service
+            sudo mv /tmp/Caddyfile /etc/caddy/Caddyfile
+            sudo systemctl daemon-reload
+            sudo systemctl enable erp
+            sudo systemctl restart erp
+            sudo systemctl reload caddy
+            sudo systemctl is-active --quiet erp && echo "erp is running"
