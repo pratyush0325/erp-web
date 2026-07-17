@@ -12,9 +12,9 @@ erp.pratyushgupta.dev {
         reverse_proxy 127.0.0.1:8082
     }
 
-    # Everything else → React SPA
+    # Everything else → Flutter web app
     handle {
-        root * /srv/erp-web/dist
+        root * /srv/erp-web/build/web
         try_files {path} /index.html
         file_server
     }
