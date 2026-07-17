@@ -3,8 +3,8 @@ import '../services/auth_service.dart';
 
 final apiClient = Dio(BaseOptions(baseUrl: '/api'))
   ..interceptors.add(InterceptorsWrapper(
-    onRequest: (options, handler) async {
-      final token = await AuthService.getToken();
+    onRequest: (options, handler) {
+      final token = AuthService.token;
       if (token != null) {
         options.headers['Authorization'] = 'Bearer $token';
       }

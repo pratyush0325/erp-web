@@ -14,13 +14,13 @@ import 'pages/admin/settings_page.dart';
 
 final router = GoRouter(
   initialLocation: '/login',
-  redirect: (context, state) async {
-    final loggedIn = await AuthService.isLoggedIn();
+  redirect: (context, state) {
+    final loggedIn = AuthService.isLoggedIn;
     final loggingIn = state.matchedLocation == '/login';
 
     if (!loggedIn && !loggingIn) return '/login';
     if (loggedIn && loggingIn) {
-      final role = (await AuthService.getRole())?.toLowerCase();
+      final role = AuthService.role?.toLowerCase();
       if (role == 'admin') return '/admin';
       if (role == 'instructor') return '/instructor';
       return '/student';
@@ -50,11 +50,9 @@ final router = GoRouter(
 GoRoute _guarded(String path, Widget page, String role) {
   return GoRoute(
     path: path,
-    redirect: (context, state) async {
-      final token = await AuthService.getToken();
-      if (token == null) return '/login';
-      final userRole = (await AuthService.getRole())?.toLowerCase();
-      if (userRole != role) return '/login';
+    redirect: (context, state) {
+      if (AuthService.token == null) return '/login';
+      if (AuthService.role?.toLowerCase() != role) return '/login';
       return null;
     },
     builder: (_, __) => page,

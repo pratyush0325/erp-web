@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'router.dart';
+import 'services/auth_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthService.init();
   runApp(const ErpApp());
 }
 

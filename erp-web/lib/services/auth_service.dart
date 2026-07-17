@@ -4,25 +4,31 @@ class AuthService {
   static const _tokenKey = 'token';
   static const _roleKey = 'role';
 
-  static SharedPreferencesAsync? _prefs;
+  static String? _token;
+  static String? _role;
 
-  static SharedPreferencesAsync get _instance =>
-      _prefs ??= SharedPreferencesAsync();
+  static final _prefs = SharedPreferencesAsync();
 
-  static Future<String?> getToken() => _instance.getString(_tokenKey);
+  static Future<void> init() async {
+    _token = await _prefs.getString(_tokenKey);
+    _role = await _prefs.getString(_roleKey);
+  }
 
-  static Future<String?> getRole() => _instance.getString(_roleKey);
-
-  static Future<bool> isLoggedIn() async =>
-      (await _instance.getString(_tokenKey)) != null;
+  static String? get token => _token;
+  static String? get role => _role;
+  static bool get isLoggedIn => _token != null;
 
   static Future<void> saveAuth(String token, String role) async {
-    await _instance.setString(_tokenKey, token);
-    await _instance.setString(_roleKey, role);
+    _token = token;
+    _role = role;
+    await _prefs.setString(_tokenKey, token);
+    await _prefs.setString(_roleKey, role);
   }
 
   static Future<void> clearAuth() async {
-    await _instance.remove(_tokenKey);
-    await _instance.remove(_roleKey);
+    _token = null;
+    _role = null;
+    await _prefs.remove(_tokenKey);
+    await _prefs.remove(_roleKey);
   }
 }
